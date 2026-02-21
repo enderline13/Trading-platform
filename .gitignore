@@ -40,3 +40,9 @@
 # debug information files
 *.dwo
 *.idea
+
+# build directories
+/build*
+
+# third party libs
+/third_party*
