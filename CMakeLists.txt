@@ -3,6 +3,10 @@ project(Platform)
 
 set(CMAKE_CXX_STANDARD 23)
 
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    add_link_options("-fuse-ld=lld")
+endif()
+
 list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/third_party/mysql-connector")
 
 add_subdirectory(client)

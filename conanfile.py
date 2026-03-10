@@ -13,7 +13,13 @@ class ConanApplication(ConanFile):
         "grpc/*:csharp_plugin": False,
         "grpc/*:python_plugin": False,
         "grpc/*:objective_c_plugin": False,
-        "mysql-connector-cpp/*:shared": True
+        "grpc/*:shared": False,
+        "protobuf/*:shared": False,
+        "abseil/*:shared": False,
+        "spdlog/*:shared": False,
+        "spdlog/*:use_std_fmt": True,
+        "benchmark/*:enable_lto": True,
+        "prometheus-cpp/*:shared": False
     }
     def layout(self):
         cmake_layout(self)
@@ -32,6 +38,7 @@ class ConanApplication(ConanFile):
         self.requires("rapidjson/1.1.0")
         self.requires("spdlog/1.17.0")
         self.requires("grpc/1.72.0")
+        self.requires("jwt-cpp/0.7.1")
 
     def build_requirements(self):
         self.tool_requires("ninja/1.13.2")

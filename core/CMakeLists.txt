@@ -11,6 +11,8 @@ set(SOURCES
         src/main.cpp
 )
 
-add_library(${PROJECT_NAME} ${SOURCES} ${HEADERS})
+add_library(${PROJECT_NAME} STATIC ${SOURCES} ${HEADERS})
 
-target_include_directories(${PROJECT_NAME} PRIVATE include/core)
+target_include_directories(${PROJECT_NAME} PUBLIC include/core)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE Market_data Matching Storage)

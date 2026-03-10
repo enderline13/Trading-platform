@@ -3,10 +3,7 @@ project(Testing)
 
 set(CMAKE_CXX_STANDARD 23)
 
-find_package(GTest REQUIRED)
-
-add_executable(${PROJECT_NAME}
-        src/main.cpp
-)
-
-target_link_libraries(${PROJECT_NAME} PRIVATE GTest::gtest GTest::gtest_main)
+add_subdirectory(core_tests)
+add_subdirectory(market_data_tests)
+add_subdirectory(matching_tests)
+add_subdirectory(storage_tests)

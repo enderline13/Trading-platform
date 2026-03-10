@@ -1,6 +1,31 @@
 #include <iostream>
+#include <memory>
+#include <string>
 
-int main() {
-    std::cout << "Hello world!" << std::endl;
+#include <grpcpp/grpcpp.h>
+//#include "test.grpc.pb.h"
+#include <jwt-cpp/jwt.h>
+
+using grpc::Server;
+using grpc::ServerBuilder;
+using grpc::ServerContext;
+using grpc::Status;
+
+void RunServer() {
+    std::string server_address("0.0.0.0:50051");
+    //GreeterServiceImpl service;
+
+    ServerBuilder builder;
+    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
+    //builder.RegisterService(&service);
+
+    std::unique_ptr<Server> server(builder.BuildAndStart());
+    std::cout << "Сервер запущен на " << server_address << std::endl;
+
+    server->Wait();
+}
+
+int main(int argc, char** argv) {
+    RunServer();
     return 0;
 }
