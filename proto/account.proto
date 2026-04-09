@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package account;
+
+import "google/protobuf/empty.proto";
+import "common.proto";
+
+message UserPositions {
+  repeated common.Position positions = 1;
+}
+
+message BalanceHistory {
+  repeated common.Decimal balances = 1;
+}
+
+service AccountService {
+
+  rpc GetBalance(google.protobuf.Empty)
+      returns (common.Decimal);
+
+  rpc GetPositions(google.protobuf.Empty)
+      returns (UserPositions);
+
+  rpc GetBalanceHistory(google.protobuf.Empty)
+      returns (BalanceHistory);
+}

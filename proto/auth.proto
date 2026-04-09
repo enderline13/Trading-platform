@@ -10,7 +10,6 @@ message RegisterRequest {
 
 message RegisterResponse {
   uint64 user_id = 1;
-  bool success = 2;
 }
 
 message LoginRequest {
@@ -20,15 +19,23 @@ message LoginRequest {
 
 message LoginResponse {
   string token = 1;
-  bool success = 2; // У тебя изначально не было, нужно ли нам всё таки это поле или jwt сам хранит произошла ли авторизация успешно?
 }
 
-message Empty {
-
+message User {
+  uint64 id = 1;
+  string username = 2;
+  string email = 3;
 }
 
-service Auth {
-  rpc registerUser (RegisterRequest) returns (RegisterResponse);
-  rpc login (LoginRequest) returns (LoginResponse);
-  rpc getCurrentUser (Empty) returns (Empty); // Не понял что здесь давать и возвращать, у тебя пусто
+message GetUserRequest {
+  uint64 user_id = 1;
+}
+
+service AuthService {
+
+  rpc RegisterUser(RegisterRequest) returns (RegisterResponse);
+
+  rpc AuthenticateUser(LoginRequest) returns (LoginResponse);
+
+  rpc GetUserById(GetUserRequest) returns (User);
 }

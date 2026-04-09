@@ -9,4 +9,4 @@ add_executable(${PROJECT_NAME}
         src/main.cpp
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE GTest::gtest GTest::gtest_main)
+target_link_libraries(${PROJECT_NAME} PRIVATE Matching GTest::gtest GTest::gtest_main)

@@ -16,5 +16,18 @@ add_subdirectory(benchmarks)
 add_subdirectory(core)
 add_subdirectory(matching)
 add_subdirectory(market_data)
+add_subdirectory(common)
+add_subdirectory(proto_generated)
 enable_testing()
 add_subdirectory(tests)
+
+add_custom_target(build_all_services)
+add_dependencies(build_all_services
+        common
+        Gateway
+        Storage
+        Core
+        Matching
+        Market_data
+        proto_generated
+)

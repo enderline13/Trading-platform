@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package common;
+
+import "google/protobuf/timestamp.proto";
+
+message Decimal {
+  int64 units = 1;
+  int32 nanos = 2;
+}
+
+message Instrument {
+  int64 id = 1;
+  string symbol = 2;
+  string name = 3;
+  Decimal tick_size = 4;
+  Decimal lot_size = 5;
+  bool is_active = 6;
+}
+
+message Order {
+
+  enum OrderType {
+    LIMIT = 0;
+    MARKET = 1;
+    STOP = 2;
+  }
+
+  enum OrderSide {
+    BUY = 0;
+    SELL = 1;
+  }
+
+  enum OrderStatus {
+    NEW = 0;
+    PARTIALLY_FILLED = 1;
+    FILLED = 2;
+    CANCELED = 3;
+    REJECTED = 4;
+  }
+
+  int64 id = 1;
+  int64 user_id = 2;
+  int64 instrument_id = 3;
+
+  OrderType type = 4;
+  OrderSide side = 5;
+
+  Decimal price = 6;
+  Decimal quantity = 7;
+  Decimal remaining_quantity = 8;
+
+  OrderStatus status = 9;
+
+  google.protobuf.Timestamp created_at = 10;
+}
+
+message Trade {
+  int64 id = 1;
+
+  int64 instrument_id = 2;
+
+  int64 buy_order_id = 3;
+  int64 sell_order_id = 4;
+
+  Decimal price = 5;
+  Decimal quantity = 6;
+
+  google.protobuf.Timestamp executed_at = 7;
+}
+
+message Position {
+  int64 instrument_id = 1;
+  Decimal quantity = 2;
+  Decimal average_price = 3;
+}
+
+message Candle {
+  google.protobuf.Timestamp time = 1;
+
+  Decimal open = 2;
+  Decimal high = 3;
+  Decimal low = 4;
+  Decimal close = 5;
+
+  Decimal volume = 6;
+}
+
+message OrderBookLevel {
+  Decimal price = 1;
+  Decimal quantity = 2;
+}

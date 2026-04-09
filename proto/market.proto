@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package market;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "common.proto";
+
+message InstrumentsList {
+  repeated common.Instrument instruments = 1;
+}
+
+message InstrumentID {
+  uint64 instrument_id = 1;
+}
+
+message OrderBook {
+
+  repeated common.OrderBookLevel bids = 1;
+
+  repeated common.OrderBookLevel asks = 2;
+}
+
+message OrderBookUpdate {
+
+  repeated common.OrderBookLevel bids = 1;
+
+  repeated common.OrderBookLevel asks = 2;
+}
+
+message RecentTrades {
+  repeated common.Trade trades = 1;
+}
+
+message CandlesRequest {
+
+  uint64 instrument_id = 1;
+
+  google.protobuf.Timestamp begin = 2;
+
+  google.protobuf.Timestamp end = 3;
+
+  uint32 limit = 4;
+}
+
+message Candles {
+  repeated common.Candle candles = 1;
+}
+
+service MarketService {
+
+  rpc ListInstruments(google.protobuf.Empty)
+      returns (InstrumentsList);
+
+  rpc GetOrderBook(InstrumentID)
+      returns (OrderBook);
+
+  rpc StreamOrderBook(InstrumentID)
+      returns (stream OrderBookUpdate);
+
+  rpc GetRecentTrades(InstrumentID)
+      returns (RecentTrades);
+
+  rpc StreamTrades(InstrumentID)
+      returns (stream common.Trade);
+
+  rpc GetCandles(CandlesRequest)
+      returns (Candles);
+}

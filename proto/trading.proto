@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package trading;
+
+import "google/protobuf/empty.proto";
+import "common.proto";
+
+message PlaceOrderRequest {
+
+  uint64 instrument_id = 1;
+
+  common.Order.OrderSide side = 2;
+
+  common.Order.OrderType type = 3;
+
+  common.Decimal price = 4;
+
+  common.Decimal quantity = 5;
+}
+
+message OrderID {
+  uint64 order_id = 1;
+}
+
+message PlaceOrderResponse {
+
+  uint64 order_id = 1;
+
+  common.Order.OrderStatus status = 2;
+}
+
+message CancelOrderResponse {
+
+  common.Order.OrderStatus status = 1;
+}
+
+message GetOrdersRequest {
+
+  optional common.Order.OrderStatus status = 1;
+
+  optional uint64 instrument_id = 2;
+}
+
+message Orders {
+  repeated common.Order orders = 1;
+}
+
+message Trades {
+  repeated common.Trade trades = 1;
+}
+
+service TradingService {
+
+  rpc PlaceOrder(PlaceOrderRequest)
+      returns (PlaceOrderResponse);
+
+  rpc CancelOrder(OrderID)
+      returns (CancelOrderResponse);
+
+  rpc GetOrders(GetOrdersRequest)
+      returns (Orders);
+
+  rpc GetOrder(OrderID)
+      returns (common.Order);
+
+  rpc GetTradeHistory(google.protobuf.Empty)
+      returns (Trades);
+}
