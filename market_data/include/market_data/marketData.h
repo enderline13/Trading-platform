@@ -6,5 +6,6 @@
 class MarketDataService {
 public:
     void onTrade(const Trade&);
-    OrderBook getSnapshot(InstrumentId);
+    void onOrderBookChange(InstrumentId);
+    //OrderBook getSnapshot(InstrumentId);
 };

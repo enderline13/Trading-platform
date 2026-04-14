@@ -35,7 +35,7 @@ class ConanApplication(ConanFile):
         self.requires("prometheus-cpp/1.3.0")
         self.requires("benchmark/1.9.4")
         self.requires("gtest/1.17.0")
-        self.requires("rapidjson/1.1.0")
+        self.requires("nlohmann_json/3.12.0")
         self.requires("spdlog/1.17.0")
         self.requires("grpc/1.72.0")
         self.requires("jwt-cpp/0.7.1")

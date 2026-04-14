@@ -15,15 +15,28 @@ enum class MatchingError {
     InstrumentNotFound
 };
 
-enum class TradingError {
-    InsufficientFunds,
-    InstrumentNotFound,
-    TradingStopped,
-    InvalidOrder
-};
-
 enum class AuthError {
     UserAlreadyExists,
     InvalidCredentials,
-    UserNotFound
+    UserNotFound,
+    InvalidToken,
+    InvalidInput
+};
+
+enum class BalanceError {
+    InvalidUser,
+    InvalidAmount,
+    InsuffucientMoney
+};
+
+enum class TradingError {
+    UserNotFound,
+    InstrumentNotFound,
+    InsufficientBalance,
+    InsufficientPosition,
+    InvalidOrder,
+
+    MatchingFailed,
+    OrderNotFound,
+    Unauthorized
 };

@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <compare>
 #include <cmath>
+#include <string>
+#include <format>
 
 struct Decimal {
     int64_t units = 0;
@@ -10,6 +12,10 @@ struct Decimal {
 
     auto operator<=>(const Decimal&) const = default;
     static constexpr int32_t kNanoFactor = 1'000'000'000;
+
+    Decimal operator-() const {
+        return {-units, -nanos};
+    }
 
     void normalize() {
         units += nanos / kNanoFactor;
@@ -72,5 +78,55 @@ struct Decimal {
         }
 
         return d;
+    }
+
+    Decimal operator*(const Decimal& other) const {
+        // Переводим оба числа в общее количество нано-единиц
+        // Используем __int128_t, чтобы результат умножения (до 10^18 * 10^18) не переполнился
+        __int128_t v1 = static_cast<__int128_t>(units) * kNanoFactor + nanos;
+        __int128_t v2 = static_cast<__int128_t>(other.units) * kNanoFactor + other.nanos;
+
+        // При умножении фиксированных чисел результат имеет масштаб S^2
+        // Формула: (a * b) / S
+        __int128_t product = v1 * v2;
+        __int128_t res_nanos = product / kNanoFactor;
+
+        return {
+            static_cast<int64_t>(res_nanos / kNanoFactor),
+            static_cast<int32_t>(res_nanos % kNanoFactor)
+        };
+    }
+
+    // Полезно также иметь оператор для умножения на целое число
+    Decimal operator*(int64_t multiplier) const {
+        __int128_t v = static_cast<__int128_t>(units) * kNanoFactor + nanos;
+        __int128_t res = v * multiplier;
+
+        return {
+            static_cast<int64_t>(res / kNanoFactor),
+            static_cast<int32_t>(res % kNanoFactor)
+        };
+    }
+
+    Decimal operator/(const Decimal& other) const {
+        __int128_t v1 = static_cast<__int128_t>(units) * kNanoFactor + nanos;
+        __int128_t v2 = static_cast<__int128_t>(other.units) * kNanoFactor + other.nanos;
+
+        // Чтобы не потерять точность при делении, сначала масштабируем числитель
+        __int128_t result_total_nanos = (v1 * kNanoFactor) / v2;
+
+        return {
+            static_cast<int64_t>(result_total_nanos / kNanoFactor),
+            static_cast<int32_t>(result_total_nanos % kNanoFactor)
+        };
+    }
+
+    std::string toString() const {
+        std::string res = std::format("{}.{:09}", units, std::abs(nanos));
+
+        res.erase(res.find_last_not_of('0') + 1);
+        if (res.back() == '.') res.pop_back();
+
+        return res;
     }
 };

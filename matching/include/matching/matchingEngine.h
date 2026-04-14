@@ -20,7 +20,6 @@ public:
     std::expected<std::shared_ptr<const OrderBook>, MatchingError> getOrderBook(InstrumentId id) const;
 
 private:
-    bool instrument_exists(InstrumentId id) const;
 
     std::unordered_map<OrderId, OrderLocation> m_order_locations;
     std::unordered_map<InstrumentId, std::shared_ptr<OrderBook>> m_books;

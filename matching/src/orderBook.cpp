@@ -101,7 +101,6 @@ void OrderBook::process_stop_orders(Decimal lastPrice, MatchResult& result) {
 
     std::vector<std::shared_ptr<Order>> triggered;
 
-    // 1. Сначала только находим те, что сработали
     for (auto it = m_stop_orders.begin(); it != m_stop_orders.end(); ) {
         auto& o = *it;
         bool trigger = (o->side == Order::Side::BUY && lastPrice >= o->price) ||
@@ -109,19 +108,17 @@ void OrderBook::process_stop_orders(Decimal lastPrice, MatchResult& result) {
 
         if (trigger) {
             triggered.push_back(o);
-            m_orders.erase(o->id);    // Убираем из мапы активных
-            it = m_stop_orders.erase(it); // Убираем из списка стопов
+            m_orders.erase(o->id);
+            it = m_stop_orders.erase(it);
         } else {
             ++it;
         }
     }
 
-    // 2. И только теперь, когда итераторы в безопасности, исполняем их
     for (auto& o : triggered) {
         o->type = Order::Type::MARKET;
         o->status = Order::Status::NEW;
 
-        // Рекурсивный вызов теперь безопасен, так как 'o' уже не в m_stop_orders
         auto res = processOrder(o);
 
         if (res) {
