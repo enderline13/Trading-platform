@@ -1,15 +1,20 @@
 #include <gtest/gtest.h>
 #include "core/AuthManager.h"
 #include "storage/IUserRepository.h"
+#include "storage/DatabaseManager.h"
 
 class AuthManagerTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        userRepo = std::make_shared<InMemoryUserRepository>();
+        auto& dbMgr = DatabaseManager::instance();
+        dbMgr.init("192.168.100.10:3306", "root", "root", "trading_platform");
+
+        auto conn = dbMgr.getConnection();
+        userRepo = std::make_shared<MySqlUserRepository>(conn);
         authManager = std::make_unique<AuthManager>(userRepo);
     }
 
-    std::shared_ptr<InMemoryUserRepository> userRepo;
+    std::shared_ptr<MySqlUserRepository> userRepo;
     std::unique_ptr<AuthManager> authManager;
 };
 
@@ -20,7 +25,6 @@ TEST_F(AuthManagerTest, RegisterSuccess) {
     auto result = authManager->registerUser(cmd);
 
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value(), 1); // Первый ID должен быть 1
 
     auto user = userRepo->getById(result.value());
     ASSERT_TRUE(user.has_value());

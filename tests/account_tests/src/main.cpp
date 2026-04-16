@@ -1,16 +1,22 @@
 #include <gtest/gtest.h>
 #include "core/AccountManager.h"
 #include "storage/IAccountRepository.h"
+#include "storage/ITradeRepository.h"
 
 class AccountManagerTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        accountRepo = std::make_shared<InMemoryAccountRepository>();
+        auto& dbMgr = DatabaseManager::instance();
+        dbMgr.init("192.168.100.10:3306", "root", "root", "trading_platform");
+
+        auto conn = dbMgr.getConnection();
+
+        accountRepo = std::make_shared<MySqlAccountRepository>(conn);
         accountManager = std::make_unique<AccountManager>(accountRepo);
-        testUserId = 42;
+        testUserId = 1;
     }
 
-    std::shared_ptr<InMemoryAccountRepository> accountRepo;
+    std::shared_ptr<MySqlAccountRepository> accountRepo;
     std::unique_ptr<AccountManager> accountManager;
     UserId testUserId;
 };
@@ -22,7 +28,7 @@ TEST_F(AccountManagerTest, DepositSuccess) {
     auto result = accountManager->deposit({testUserId, amount});
 
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(accountManager->getBalance(testUserId).value(), amount);
+    EXPECT_EQ(accountManager->getBalance(testUserId).value(), amount) << amount.toString();
 }
 
 TEST_F(AccountManagerTest, DepositNegativeAmountFails) {

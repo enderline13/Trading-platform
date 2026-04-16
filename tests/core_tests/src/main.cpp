@@ -9,11 +9,15 @@
 class CoreIntegrationTest : public ::testing::Test {
 protected:
     void SetUp() override {
+        auto& dbMgr = DatabaseManager::instance();
+        dbMgr.init("192.168.100.10:3306", "root", "root", "trading_platform");
+
+        auto conn = dbMgr.getConnection();
         // Инициализация всех зависимостей
-        auto users = std::make_shared<InMemoryUserRepository>();
-        auto orders = std::make_shared<InMemoryOrderRepository>();
-        auto trades = std::make_shared<InMemoryTradeRepository>();
-        auto accounts = std::make_shared<InMemoryAccountRepository>();
+        auto users = std::make_shared<MySqlUserRepository>(conn);
+        auto orders = std::make_shared<MySqlOrderRepository>(conn);
+        auto trades = std::make_shared<MySqlTradeRepository>(conn);
+        auto accounts = std::make_shared<MySqlAccountRepository>(conn);
         auto matching = std::make_shared<MatchingEngine>();
 
         // Создаем фасад Core
@@ -25,13 +29,13 @@ protected:
 
 TEST_F(CoreIntegrationTest, UserFinancialLifecycle) {
     // 1. Регистрация
-    RegisterCommand reg{"trader1", "trader1@test.com", "secure_pass"};
+    RegisterCommand reg{"trader3", "trader3@test.com", "secure_pass"};
     auto regRes = core->registerUser(reg);
     ASSERT_TRUE(regRes.has_value());
     UserId id = regRes.value();
 
     // 2. Логин и получение токена
-    auto tokenRes = core->login({"trader1", "secure_pass"});
+    auto tokenRes = core->login({"trader3", "secure_pass"});
     ASSERT_TRUE(tokenRes.has_value());
     std::string token = tokenRes.value();
 
@@ -47,7 +51,7 @@ TEST_F(CoreIntegrationTest, UserFinancialLifecycle) {
 
     // 5. Проверка итогового баланса
     auto balance = core->getBalance(id);
-    EXPECT_EQ(balance.value(), depositAmt);
+    EXPECT_EQ(balance.value(), depositAmt) << balance.value().toString();
 }
 
 TEST_F(CoreIntegrationTest, FullTradeExecutionBetweenTwoUsers) {

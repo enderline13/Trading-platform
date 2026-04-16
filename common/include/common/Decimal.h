@@ -130,3 +130,14 @@ struct Decimal {
         return res;
     }
 };
+
+inline Decimal decimalFromSql(const std::string& s) {
+    if (s.empty()) return {0, 0};
+    double val = std::stod(s);
+    return Decimal::fromDouble(val);
+}
+
+inline std::string decimalToSql(const Decimal& d) {
+    // MySQL DECIMAL(18,8) — округляем до 8 знаков или просто выводим как есть
+    return d.toString();
+}

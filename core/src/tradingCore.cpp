@@ -61,6 +61,10 @@ TradingCore::placeOrder(const PlaceOrderCommand& cmd)
         }
     }
 
+    for (const auto& id : result->filled_order_ids) {
+        m_orders->update(Order{.id = id, .remaining_quantity = 0, .status = OrderStatus::FILLED});
+    }
+
     m_orders->update(order);
 
     return id;

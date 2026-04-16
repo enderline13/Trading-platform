@@ -8,6 +8,7 @@ set(HEADERS
         include/storage/IAccountRepository.h
         include/storage/ITradeRepository.h
         include/storage/IUserRepository.h
+        include/storage/DatabaseManager.h
 )
 
 set(SOURCES
@@ -21,7 +22,7 @@ find_package(mysql-concpp REQUIRED)
 
 add_library(${PROJECT_NAME} STATIC ${SOURCES} ${HEADERS})
 
-target_link_libraries(${PROJECT_NAME} PRIVATE mysql::concpp)
+target_link_libraries(${PROJECT_NAME} PUBLIC mysql::concpp-jdbc)
 
 target_include_directories(${PROJECT_NAME} PUBLIC include/)
 

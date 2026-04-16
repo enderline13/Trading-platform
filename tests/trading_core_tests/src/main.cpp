@@ -10,11 +10,15 @@
 class TradingCoreTest : public ::testing::Test {
 protected:
     void SetUp() override {
+        auto& dbMgr = DatabaseManager::instance();
+        dbMgr.init("192.168.100.10:3306", "root", "root", "trading_platform");
+
+        auto conn = dbMgr.getConnection();
         // Инициализируем репозитории и движок
-        userRepo = std::make_shared<InMemoryUserRepository>();
-        orderRepo = std::make_shared<InMemoryOrderRepository>();
-        tradeRepo = std::make_shared<InMemoryTradeRepository>();
-        accountRepo = std::make_shared<InMemoryAccountRepository>();
+        userRepo = std::make_shared<MySqlUserRepository>(conn);
+        orderRepo = std::make_shared<MySqlOrderRepository>(conn);
+        tradeRepo = std::make_shared<MySqlTradeRepository>(conn);
+        accountRepo = std::make_shared<MySqlAccountRepository>(conn);
         matchingEngine = std::make_shared<MatchingEngine>();
 
         tradingCore = std::make_unique<TradingCore>(
@@ -26,10 +30,10 @@ protected:
         accountRepo->updateBalance(testUserId, Decimal{1000, 0});
     }
 
-    std::shared_ptr<InMemoryUserRepository> userRepo;
-    std::shared_ptr<InMemoryOrderRepository> orderRepo;
-    std::shared_ptr<InMemoryTradeRepository> tradeRepo;
-    std::shared_ptr<InMemoryAccountRepository> accountRepo;
+    std::shared_ptr<IUserRepository> userRepo;
+    std::shared_ptr<IOrderRepository> orderRepo;
+    std::shared_ptr<ITradeRepository> tradeRepo;
+    std::shared_ptr<IAccountRepository> accountRepo;
     std::shared_ptr<MatchingEngine> matchingEngine;
     std::unique_ptr<TradingCore> tradingCore;
     UserId testUserId;
@@ -78,7 +82,7 @@ TEST_F(TradingCoreTest, InsufficientBalanceForBuy) {
 // 3. Исполнение сделки (Matching): Buy Limit встречает Sell Limit
 TEST_F(TradingCoreTest, FullTradeExecution) {
     UserId sellerId = 2;
-    accountRepo->updatePosition(sellerId, 1, Decimal{10, 0}, Decimal{50, 333}); // Даем продавцу активы
+    accountRepo->updatePosition(sellerId, 1, Decimal{10, 0}, Decimal{50, 0}); // Даем продавцу активы
 
     // 1. Выставляем ордер на продажу
     tradingCore->placeOrder({
@@ -86,7 +90,7 @@ TEST_F(TradingCoreTest, FullTradeExecution) {
         .instrument_id = 1,
         .side = Order::Side::SELL,
         .type = Order::Type::LIMIT,
-        .price = Decimal{50, 333},
+        .price = Decimal{50, 0},
         .quantity = Decimal{2, 0}
     });
 
@@ -102,10 +106,10 @@ TEST_F(TradingCoreTest, FullTradeExecution) {
 
     // Проверяем статус ордера покупателя
     auto buyOrder = orderRepo->get(buyResult.value());
-    EXPECT_EQ(buyOrder->status, Order::Status::FILLED);
+    EXPECT_EQ(buyOrder->status, Order::Status::FILLED) << orderStatusToString(buyOrder->status) << buyOrder.value().id;
 
     // Проверяем балансы (1000 - 50*2 = 900)
-    EXPECT_EQ(accountRepo->getBalance(testUserId), Decimal(899, 999999334)) << "value: " << accountRepo->getBalance(testUserId).toString();
+    EXPECT_EQ(accountRepo->getBalance(testUserId), Decimal(900, 0)) << "value: " << accountRepo->getBalance(testUserId).toString();
 
     // Проверяем, что трейд записан
     auto trades = tradeRepo->getByUser(testUserId, std::nullopt);

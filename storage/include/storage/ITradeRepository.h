@@ -3,6 +3,8 @@
 #include <mutex>
 #include <unordered_map>
 
+#include "mysql/jdbc.h"
+
 #include "common/Types.h"
 #include "common/Trade.h"
 
@@ -57,4 +59,47 @@ private:
     std::unordered_map<UserId, std::vector<Trade>> m_userTrades;
 
     mutable std::mutex m_mutex;
+};
+
+class MySqlTradeRepository : public ITradeRepository {
+    std::shared_ptr<sql::Connection> m_conn;
+public:
+    MySqlTradeRepository(std::shared_ptr<sql::Connection> conn) : m_conn(conn) {}
+    void save(const Trade& trade, UserId buyer, UserId seller) override {
+        auto pstmt = m_conn->prepareStatement(
+            "INSERT INTO trades (instrument_id, buy_order_id, sell_order_id, price, quantity) VALUES (?, ?, ?, ?, ?)"
+        );
+        pstmt->setInt64(1, trade.instrument_id);
+        pstmt->setInt64(2, trade.buy_order_id);
+        pstmt->setInt64(3, trade.sell_order_id);
+        pstmt->setString(4, decimalToSql(trade.price));
+        pstmt->setString(5, decimalToSql(trade.quantity));
+        pstmt->executeUpdate();
+    }
+
+    std::vector<Trade> getByUser(UserId userId, std::optional<InstrumentId> instId) override {
+        std::string query =
+            "SELECT DISTINCT t.* FROM trades t "
+            "JOIN orders o ON (t.buy_order_id = o.id OR t.sell_order_id = o.id) "
+            "WHERE o.user_id = ?";
+
+        if (instId) query += " AND t.instrument_id = " + std::to_string(*instId);
+
+        auto pstmt = m_conn->prepareStatement(query);
+        pstmt->setInt64(1, userId);
+        auto res = pstmt->executeQuery();
+
+        std::vector<Trade> result;
+        while (res->next()) {
+            result.push_back({
+                res->getUInt64("id"),
+                res->getUInt64("instrument_id"),
+                res->getUInt64("buy_order_id"),
+                res->getUInt64("sell_order_id"),
+                decimalFromSql(res->getString("price")),
+                decimalFromSql(res->getString("quantity"))
+            });
+        }
+        return result;
+    }
 };
