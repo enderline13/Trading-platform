@@ -100,17 +100,19 @@ TEST_F(CoreIntegrationTest, OrderCancellationAndSafety) {
     core->deposit({user, Decimal{1000, 0}});
 
     // Ставим ордер, который никто не купит (дорого)
-    auto orderId = core->placeOrder({user, 1, Order::Side::BUY, Order::Type::LIMIT, {900, 0}, {1, 0}}).value();
+    auto orderId = core->placeOrder({user, 1, Order::Side::BUY, Order::Type::LIMIT, {900, 0}, {1, 0}});
+    ASSERT_TRUE(orderId.has_value());
 
     // Отменяем его
-    auto cancelRes = core->cancelOrder({user, orderId});
+    auto cancelRes = core->cancelOrder({user, orderId.value()});
     EXPECT_TRUE(cancelRes.has_value());
 
     // Проверяем, что в списке активных ордеров его нет или он CANCELED
     auto orders = core->getUserOrders({user});
+    ASSERT_TRUE(orders.has_value());
     bool foundAndCanceled = false;
     for (const auto& o : orders.value()) {
-        if (o.id == orderId && o.status == Order::Status::CANCELED) {
+        if (o.id == orderId.value() && o.status == Order::Status::CANCELED) {
             foundAndCanceled = true;
         }
     }

@@ -105,3 +105,15 @@ CREATE TABLE system_state (
 );
 
 INSERT INTO system_state (id, trading_status) VALUES (1, 'RUNNING');
+
+DELIMITER //
+
+CREATE TRIGGER after_user_insert
+AFTER INSERT ON trading_platform.users
+FOR EACH ROW
+BEGIN
+    INSERT INTO trading_platform.accounts (user_id, balance_cash)
+    VALUES (NEW.id, '0.00000000');
+END //
+
+DELIMITER ;

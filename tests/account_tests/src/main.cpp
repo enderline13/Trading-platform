@@ -13,7 +13,7 @@ protected:
 
         accountRepo = std::make_shared<MySqlAccountRepository>(conn);
         accountManager = std::make_unique<AccountManager>(accountRepo);
-        testUserId = 1;
+        testUserId = 11;
     }
 
     std::shared_ptr<MySqlAccountRepository> accountRepo;

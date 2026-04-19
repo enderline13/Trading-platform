@@ -26,7 +26,7 @@ protected:
         );
 
         // Подготовим тестового пользователя с балансом
-        testUserId = 1;
+        testUserId = 11;
         accountRepo->updateBalance(testUserId, Decimal{1000, 0});
     }
 
@@ -81,7 +81,7 @@ TEST_F(TradingCoreTest, InsufficientBalanceForBuy) {
 
 // 3. Исполнение сделки (Matching): Buy Limit встречает Sell Limit
 TEST_F(TradingCoreTest, FullTradeExecution) {
-    UserId sellerId = 2;
+    UserId sellerId = 12;
     accountRepo->updatePosition(sellerId, 1, Decimal{10, 0}, Decimal{50, 0}); // Даем продавцу активы
 
     // 1. Выставляем ордер на продажу
@@ -100,7 +100,7 @@ TEST_F(TradingCoreTest, FullTradeExecution) {
         .instrument_id = 1,
         .side = Order::Side::BUY,
         .type = Order::Type::LIMIT,
-        .price = Decimal{50, 333},
+        .price = Decimal{50, 0},
         .quantity = Decimal{2, 0}
     });
 
