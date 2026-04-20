@@ -1,22 +1,30 @@
 #include "core/tradingCore.h"
 
+#include "core/TransactionGuard.h"
+
 std::expected<OrderId, TradingError>
 TradingCore::placeOrder(const PlaceOrderCommand& cmd)
 {
+    // 1. Инициализируем транзакцию. Если метод выйдет по return или исключению — случится rollback.
+    TransactionGuard tx(m_conn);
+
+    // Базовые валидации
     if (cmd.quantity <= Decimal(0,0))
         return std::unexpected(TradingError::InvalidOrder);
 
     if (cmd.type == Order::Type::LIMIT && cmd.price <= Decimal(0,0))
         return std::unexpected(TradingError::InvalidOrder);
 
-    Decimal userBalance = m_accounts->getBalance(cmd.user_id);
-
+    // Проверка баланса (только для покупки)
+    // В идеале для SELL нужно проверять наличие акций в Positions, но пока сфокусируемся на деньгах.
     if (cmd.side == Order::Side::BUY) {
+        Decimal userBalance = m_accounts->getBalance(cmd.user_id);
         Decimal required = cmd.price * cmd.quantity;
         if (userBalance < required)
             return std::unexpected(TradingError::InsufficientBalance);
     }
 
+    // 2. Создаем структуру ордера
     Order order;
     order.user_id = cmd.user_id;
     order.instrument_id = cmd.instrument_id;
@@ -28,44 +36,65 @@ TradingCore::placeOrder(const PlaceOrderCommand& cmd)
     order.status = Order::Status::NEW;
     order.created_at = std::chrono::system_clock::now();
 
+    // Сохраняем в БД и получаем ID
     OrderId id = m_orders->create(order);
     order.id = id;
 
+    // 3. Отправляем в Matching Engine (работает в памяти)
     auto orderPtr = std::make_shared<Order>(order);
-
     auto result = m_matching->submitOrder(orderPtr);
+
     if (!result)
         return std::unexpected(TradingError::MatchingFailed);
 
+    // Обновляем состояние нашего ордера после матчинга (изменится статус и remaining_quantity)
     order = *orderPtr;
 
+    // 4. Обработка совершенных сделок
     for (const auto& trade : result->trades) {
-        // 1. Получаем ID пользователей (твой выбранный вариант через ордера)
+        // Получаем данные ордеров участников, чтобы знать их user_id
         auto buyOrder = m_orders->get(trade.buy_order_id);
         auto sellOrder = m_orders->get(trade.sell_order_id);
 
         if (buyOrder && sellOrder) {
-            // 2. Сохраняем трейд (с нашей новой сигнатурой save)
-            m_trades->save(trade, buyOrder->user_id, sellOrder->user_id);
+            // Сохраняем сделку в БД и получаем её ID для истории баланса
+            uint64_t tradeId = m_trades->save(trade, buyOrder->user_id, sellOrder->user_id);
 
-            // 3. Обновляем деньги
-            Decimal totalAmount = trade.price * trade.quantity;
-            m_accounts->changeBalance(buyOrder->user_id, -totalAmount);
-            m_accounts->changeBalance(sellOrder->user_id, totalAmount);
+            Decimal totalCost = trade.price * trade.quantity;
 
-            // 4. ОБНОВЛЯЕМ ПОЗИЦИИ (Вот здесь скорее всего пусто!)
+            // --- ОБРАБОТКА ПОКУПАТЕЛЯ ---
+            uint64_t buyerAccId = m_accounts->getAccountIdByUserId(buyOrder->user_id);
+            m_accounts->changeBalance(buyOrder->user_id, -totalCost); // Уменьшаем баланс
+            m_accounts->addHistoryEntry(buyerAccId, -totalCost, "TRADE", tradeId); // Пишем в историю
+
             m_accounts->updatePosition(buyOrder->user_id, trade.instrument_id,
                                        trade.quantity, trade.price);
+
+            // --- ОБРАБОТКА ПРОДАВЦА ---
+            uint64_t sellerAccId = m_accounts->getAccountIdByUserId(sellOrder->user_id);
+            m_accounts->changeBalance(sellOrder->user_id, totalCost); // Увеличиваем баланс
+            m_accounts->addHistoryEntry(sellerAccId, totalCost, "TRADE", tradeId); // Пишем в историю
+
             m_accounts->updatePosition(sellOrder->user_id, trade.instrument_id,
                                        -trade.quantity, trade.price);
         }
     }
 
-    for (const auto& id : result->filled_order_ids) {
-        m_orders->update(Order{.id = id, .remaining_quantity = 0, .status = OrderStatus::FILLED});
+    // 5. Обновляем статусы Maker-ордеров, которые были полностью или частично исполнены
+    // (Их статус изменился внутри MatchingEngine, нужно синхронизировать с БД)
+    for (const auto& filledId : result->filled_order_ids) {
+        // Мы не можем просто создать пустой Order, нужно обновить статус в БД.
+        // Предположим, у m_orders есть метод updateStatus или мы обновляем по ID
+        m_orders->updateStatus(filledId, Order::Status::FILLED, Decimal(0,0));
     }
 
+    // 6. Обновляем наш текущий (Taker) ордер
     m_orders->update(order);
+
+    // 7. ФИНАЛЬНЫЙ КОММИТ
+    // Если мы дошли до этой точки, значит ни один throw не вылетел,
+    // и все изменения в БД (ордер, трейды, балансы, история) зафиксируются атомарно.
+    tx.commit();
 
     return id;
 }

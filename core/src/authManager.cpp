@@ -1,11 +1,22 @@
-#include "core/authManager.h"
+#include <random>
 
+#include "core/authManager.h"
 #include "common/errors.h"
 
-#include <jwt-cpp/jwt.h>
-#include <jwt-cpp/traits/nlohmann-json/defaults.h>
+std::string generateRandomToken() {
+    static const char charset[] = "0123456789ABCDEF";
+    std::string result;
+    result.reserve(32);
 
-static const std::string JWT_SECRET = "super_secret_key";
+    std::random_device rd;
+    std::mt19937 generator(rd());
+    std::uniform_int_distribution<int> distribution(0, 15);
+
+    for (int i = 0; i < 32; ++i) {
+        result += charset[distribution(generator)];
+    }
+    return result;
+}
 
 std::string hashPassword(const std::string& password) {
     return std::to_string(std::hash<std::string>{}(password));
@@ -17,40 +28,34 @@ AuthManager::registerUser(const RegisterCommand& cmd)
     if (cmd.username.empty() || cmd.password.empty() || cmd.email.empty())
         return std::unexpected(AuthError::InvalidInput);
 
-    auto existing = m_users->getByEmail(cmd.email);
-    if (existing)
+    if (m_users->getByEmail(cmd.email))
         return std::unexpected(AuthError::UserAlreadyExists);
 
     User user;
     user.username = cmd.username;
     user.email = cmd.email;
-    user.password_hash = hashPassword(cmd.password);
+    user.password_hash = hashPassword(cmd.password); // Твоя функция хеширования
 
-    UserId id = m_users->create(user);
-
-    return id;
+    return m_users->create(user);
 }
 
 std::expected<Token, AuthError>
 AuthManager::login(const LoginCommand& cmd)
 {
     auto userOpt = m_users->getByEmail(cmd.username);
-    if (!userOpt) {
-        userOpt = m_users->getByUsername(cmd.username);
-    }
+    if (!userOpt) userOpt = m_users->getByUsername(cmd.username);
     if (!userOpt) return std::unexpected(AuthError::UserNotFound);
 
-    const auto& user = *userOpt;
-
-    if (user.password_hash != hashPassword(cmd.password))
+    if (userOpt->password_hash != hashPassword(cmd.password))
         return std::unexpected(AuthError::InvalidCredentials);
 
-    // Используем jwt::create<jwt::default_traits>() для явного указания трейтов
-    auto token = jwt::create<jwt::traits::nlohmann_json>()
-        .set_type("JWT")
-        .set_issuer("trading_app")
-        .set_payload_claim("user_id", jwt::basic_claim<jwt::traits::nlohmann_json>(std::to_string(user.id))) // Просто строка
-        .sign(jwt::algorithm::hs256{JWT_SECRET});
+    // Генерируем токен и сохраняем сессию
+    std::string token = generateRandomToken();
+
+    {
+        std::unique_lock lock(m_sessionMutex);
+        m_sessions[token] = userOpt->id;
+    }
 
     return token;
 }
@@ -58,29 +63,25 @@ AuthManager::login(const LoginCommand& cmd)
 std::expected<User, AuthError>
 AuthManager::validateToken(const Token& token) const
 {
-    try {
-        // Явно указываем декодеру использовать дефолтные трейты (rapidjson)
-        auto decoded = jwt::decode<jwt::traits::nlohmann_json>(token);
-
-        auto verifier = jwt::verify<jwt::traits::nlohmann_json>()
-            .allow_algorithm(jwt::algorithm::hs256{JWT_SECRET})
-            .with_issuer("trading_app");
-
-        verifier.verify(decoded);
-
-        // Получаем claim как строку
-        std::string userIdStr = decoded.get_payload_claim("user_id").as_string();
-        UserId userId = std::stoull(userIdStr);
-
-        auto userOpt = m_users->getById(userId);
-        if (!userOpt) return std::unexpected(AuthError::UserNotFound);
-
-        return *userOpt;
+    UserId uid;
+    {
+        std::shared_lock lock(m_sessionMutex);
+        auto it = m_sessions.find(token);
+        if (it == m_sessions.end()) {
+            return std::unexpected(AuthError::InvalidToken);
+        }
+        uid = it->second;
     }
-    catch (const std::exception& e) {
-        // Полезно для отладки: spdlog::error("JWT validation failed: {}", e.what());
-        return std::unexpected(AuthError::InvalidToken);
-    }
+
+    auto userOpt = m_users->getById(uid);
+    if (!userOpt) return std::unexpected(AuthError::UserNotFound);
+
+    return *userOpt;
+}
+
+void AuthManager::logout(const Token& token) {
+    std::unique_lock lock(m_sessionMutex);
+    m_sessions.erase(token);
 }
 
 std::expected<User, AuthError>

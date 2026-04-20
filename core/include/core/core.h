@@ -11,16 +11,17 @@
 
 class Core {
 public:
-    Core(
+    Core (
+            std::shared_ptr<sql::Connection> conn,
             std::shared_ptr<IUserRepository> users,
             std::shared_ptr<IOrderRepository> orders,
             std::shared_ptr<ITradeRepository> trades,
             std::shared_ptr<IAccountRepository> accounts,
             std::shared_ptr<MatchingEngine> matching
         )
-            : auth(users),
-              trading(orders, trades, accounts, matching),
-              account(accounts) {}
+            : m_conn(conn), auth(conn, users),
+              trading(conn, orders, trades, accounts, matching),
+              account(conn, accounts) {}
 
     std::expected<UserId, AuthError> registerUser(const RegisterCommand& cmd) {
         return auth.registerUser(cmd);
@@ -68,6 +69,8 @@ public:
         return account.withdraw(cmd);
     }
 private:
+    std::shared_ptr<sql::Connection> m_conn;
+
     AuthManager auth;
     TradingCore trading;
     AccountManager account;

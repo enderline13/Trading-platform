@@ -1,4 +1,5 @@
 #include "core/accountManager.h"
+#include "core/TransactionGuard.h"
 
 std::expected<Decimal, BalanceError>
 AccountManager::getBalance(UserId id) const {
@@ -14,11 +15,17 @@ AccountManager::getPositions(UserId id) const {
 
 std::expected<void, BalanceError>
 AccountManager::deposit(const DepositCommand& cmd) {
+    TransactionGuard tx(m_conn);
     if (cmd.amount <= Decimal{0, 0}) {
         return std::unexpected(BalanceError::InvalidAmount); // Нужно добавить в enum
     }
 
+    uint64_t accId = m_accounts->getAccountIdByUserId(cmd.user_id);
     m_accounts->changeBalance(cmd.user_id, cmd.amount);
+
+    m_accounts->addHistoryEntry(accId, cmd.amount, "DEPOSIT", std::nullopt);
+
+    tx.commit();
     return {};
 }
 
@@ -28,6 +35,7 @@ AccountManager::withdraw(const WithdrawCommand& cmd) {
         return std::unexpected(BalanceError::InvalidAmount);
     }
 
+    uint64_t accId = m_accounts->getAccountIdByUserId(cmd.user_id);
     Decimal currentBalance = m_accounts->getBalance(cmd.user_id);
     if (currentBalance < cmd.amount) {
         return std::unexpected(BalanceError::InsuffucientMoney);
@@ -39,5 +47,6 @@ AccountManager::withdraw(const WithdrawCommand& cmd) {
     delta.nanos = -delta.nanos;
 
     m_accounts->changeBalance(cmd.user_id, delta);
+    m_accounts->addHistoryEntry(accId, cmd.amount, "DEPOSIT", std::nullopt);
     return {};
 }

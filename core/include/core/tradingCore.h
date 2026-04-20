@@ -39,10 +39,10 @@ struct GetTradesQuery {
 
 class TradingCore {
 public:
-    TradingCore(std::shared_ptr<IOrderRepository> orders,
+    TradingCore(std::shared_ptr<sql::Connection> conn, std::shared_ptr<IOrderRepository> orders,
             std::shared_ptr<ITradeRepository> trades,
             std::shared_ptr<IAccountRepository> accounts,
-            std::shared_ptr<MatchingEngine> matching) : m_orders(orders), m_trades(trades), m_accounts(accounts), m_matching(matching) {}
+            std::shared_ptr<MatchingEngine> matching) : m_conn(conn), m_orders(orders), m_trades(trades), m_accounts(accounts), m_matching(matching) {}
     std::expected<OrderId, TradingError> placeOrder(const PlaceOrderCommand&);
     std::expected<void, TradingError> cancelOrder(const CancelOrderCommand&);
 
@@ -50,6 +50,8 @@ public:
     std::expected<std::vector<Trade>, TradingError> getTradeHistory(const GetTradesQuery&) const;
 
 private:
+    std::shared_ptr<sql::Connection> m_conn;
+
     std::shared_ptr<IOrderRepository> m_orders;
     std::shared_ptr<ITradeRepository> m_trades;
     std::shared_ptr<IAccountRepository> m_accounts;

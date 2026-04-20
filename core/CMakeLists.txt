@@ -11,12 +11,14 @@ set(HEADERS
         include/core/accountManager.h
         include/core/authManager.h
         include/core/core.h
+        include/core/TransactionGuard.h
 )
 
 set(SOURCES
         src/tradingCore.cpp
         src/accountManager.cpp
         src/authManager.cpp
+        include/core/TransactionGuard.h
 )
 
 add_library(${PROJECT_NAME} STATIC ${SOURCES} ${HEADERS})

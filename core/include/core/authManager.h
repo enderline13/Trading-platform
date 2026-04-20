@@ -1,6 +1,7 @@
 #pragma once
 
 #include <expected>
+#include <shared_mutex>
 
 #include "common/Types.h"
 #include "common/User.h"
@@ -22,12 +23,18 @@ struct LoginCommand {
 
 class AuthManager {
 public:
-    AuthManager(std::shared_ptr<IUserRepository> users) : m_users(users) {}
+    AuthManager(std::shared_ptr<sql::Connection> conn, std::shared_ptr<IUserRepository> users) : m_conn(conn), m_users(users) {}
     std::expected<UserId, AuthError> registerUser(const RegisterCommand&);
     std::expected<Token, AuthError> login(const LoginCommand&);
     std::expected<User, AuthError> validateToken(const Token&) const;
     std::expected<User, AuthError> getUser(UserId) const;
+    void logout(const Token& token);
 
 private:
     std::shared_ptr<IUserRepository> m_users;
+
+    std::shared_ptr<sql::Connection> m_conn;
+
+    std::unordered_map<std::string, UserId> m_sessions;
+    mutable std::shared_mutex m_sessionMutex;
 };
