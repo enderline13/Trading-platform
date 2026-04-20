@@ -1,3 +1,26 @@
 syntax = "proto3";
 
+package admin;
+
 import "common.proto";
+import "google/protobuf/empty.proto";
+
+message FundRequest {
+  uint64 user_id = 1;
+  common.Decimal amount = 2;
+}
+
+message SystemStatus {
+  bool is_running = 1;
+  uint64 active_orders_count = 2;
+  uint64 total_users_count = 3;
+  string server_version = 4;
+  string uptime = 5;
+}
+
+service AdminService {
+  rpc AddInstrument(common.Instrument) returns (google.protobuf.Empty);
+  rpc UpdateInstrument(common.Instrument) returns (google.protobuf.Empty);
+  rpc FundUserAccount(FundRequest) returns (google.protobuf.Empty); // Ручное начисление денег
+  rpc GetSystemStatus(google.protobuf.Empty) returns (SystemStatus); // Нагрузка, кол-во активных ордеров
+}
