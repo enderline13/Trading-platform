@@ -20,7 +20,7 @@ protected:
 
 // Тест 1: Успешная регистрация
 TEST_F(AuthManagerTest, RegisterSuccess) {
-    RegisterCommand cmd{"dev_user", "dev@example.com", "password123"};
+    RegisterCommand cmd{"dev_userr", "devdd@example.com", "password123"};
 
     auto result = authManager->registerUser(cmd);
 
@@ -28,7 +28,7 @@ TEST_F(AuthManagerTest, RegisterSuccess) {
 
     auto user = userRepo->getById(result.value());
     ASSERT_TRUE(user.has_value());
-    EXPECT_EQ(user->username, "dev_user");
+    EXPECT_EQ(user->username, "dev_userr");
 }
 
 // Тест 2: Ошибка при регистрации дубликата Email

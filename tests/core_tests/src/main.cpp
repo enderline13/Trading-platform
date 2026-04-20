@@ -29,13 +29,13 @@ protected:
 
 TEST_F(CoreIntegrationTest, UserFinancialLifecycle) {
     // 1. Регистрация
-    RegisterCommand reg{"trader3", "trader3@test.com", "secure_pass"};
+    RegisterCommand reg{"trader34", "trader343@test.com", "secure_passs"};
     auto regRes = core->registerUser(reg);
     ASSERT_TRUE(regRes.has_value());
     UserId id = regRes.value();
 
     // 2. Логин и получение токена
-    auto tokenRes = core->login({"trader3", "secure_pass"});
+    auto tokenRes = core->login({"trader34", "secure_passs"});
     ASSERT_TRUE(tokenRes.has_value());
     std::string token = tokenRes.value();
 
@@ -56,8 +56,8 @@ TEST_F(CoreIntegrationTest, UserFinancialLifecycle) {
 
 TEST_F(CoreIntegrationTest, FullTradeExecutionBetweenTwoUsers) {
     // Создаем Покупателя и Продавца
-    UserId buyer = core->registerUser({"buyer", "b@test.com", "p"}).value();
-    UserId seller = core->registerUser({"seller", "s@test.com", "p"}).value();
+    UserId buyer = core->registerUser({"buyer", "bb@test.com", "p"}).value();
+    UserId seller = core->registerUser({"seller", "ss@test.com", "p"}).value();
 
     // Покупателю даем деньги, продавцу — активы
     core->deposit({buyer, Decimal{1000, 0}});
@@ -96,7 +96,7 @@ TEST_F(CoreIntegrationTest, FullTradeExecutionBetweenTwoUsers) {
 }
 
 TEST_F(CoreIntegrationTest, OrderCancellationAndSafety) {
-    UserId user = core->registerUser({"user", "u@u.com", "p"}).value();
+    UserId user = core->registerUser({"userrr", "uuu@u.com", "p"}).value();
     core->deposit({user, Decimal{1000, 0}});
 
     // Ставим ордер, который никто не купит (дорого)

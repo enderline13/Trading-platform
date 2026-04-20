@@ -12,7 +12,7 @@ protected:
         auto conn = dbMgr.getConnection();
 
         accountRepo = std::make_shared<MySqlAccountRepository>(conn);
-        accountManager = std::make_unique<AccountManager>(accountRepo);
+        accountManager = std::make_unique<AccountManager>(conn, accountRepo);
         testUserId = 11;
     }
 

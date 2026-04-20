@@ -21,7 +21,7 @@ protected:
         accountRepo = std::make_shared<MySqlAccountRepository>(conn);
         matchingEngine = std::make_shared<MatchingEngine>();
 
-        tradingCore = std::make_unique<TradingCore>(
+        tradingCore = std::make_unique<TradingCore>(conn,
             orderRepo, tradeRepo, accountRepo, matchingEngine
         );
 
