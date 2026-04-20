@@ -16,61 +16,26 @@ public:
     virtual std::optional<Order> get(OrderId) = 0;
     virtual std::vector<Order> getByUser(UserId) = 0;
     virtual void update(const Order&) = 0;
-};
-
-class InMemoryOrderRepository : public IOrderRepository {
-public:
-    OrderId create(const Order& order) override {
-        std::lock_guard lock(m_mutex);
-
-        Order copy = order;
-        copy.id = m_nextId++;
-
-        m_orders[copy.id] = copy;
-        m_userOrders[copy.user_id].push_back(copy.id);
-
-        return copy.id;
-    }
-
-    std::optional<Order> get(OrderId id) override {
-        std::lock_guard lock(m_mutex);
-
-        if (!m_orders.contains(id)) return std::nullopt;
-        return m_orders[id];
-    }
-
-    std::vector<Order> getByUser(UserId userId) override {
-        std::lock_guard lock(m_mutex);
-
-        std::vector<Order> result;
-
-        for (auto id : m_userOrders[userId]) {
-            result.push_back(m_orders[id]);
-        }
-
-        return result;
-    }
-
-    void update(const Order& order) override {
-        std::lock_guard lock(m_mutex);
-
-        if (m_orders.contains(order.id)) {
-            m_orders[order.id] = order;
-        }
-    }
-
-private:
-    std::unordered_map<OrderId, Order> m_orders;
-    std::unordered_map<UserId, std::vector<OrderId>> m_userOrders;
-
-    OrderId m_nextId{1};
-    std::mutex m_mutex;
+    virtual void updateStatus(OrderId id, Order::Status status, Decimal remainingQty) = 0;
 };
 
 class MySqlOrderRepository : public IOrderRepository {
     std::shared_ptr<sql::Connection> m_conn;
 public:
     MySqlOrderRepository(std::shared_ptr<sql::Connection> conn) : m_conn(conn) {}
+
+    void updateStatus(OrderId id, Order::Status status, Decimal remainingQty) override {
+        auto pstmt = m_conn->prepareStatement(
+            "UPDATE orders SET status = ?, remaining_quantity = ? WHERE id = ?"
+        );
+
+        // Преобразуем enum в строку, как он задан в базе (LIMIT, MARKET...)
+        pstmt->setString(1, orderStatusToString(status));
+        pstmt->setString(2, decimalToSql(remainingQty));
+        pstmt->setUInt64(3, id);
+
+        pstmt->executeUpdate();
+    }
 
     OrderId create(const Order& order) override {
         auto pstmt = m_conn->prepareStatement(

@@ -17,74 +17,11 @@ public:
     virtual Decimal getBalance(UserId userId) = 0;
     virtual void updateBalance(UserId userId, Decimal newBalance) = 0;
     virtual void changeBalance(UserId userId, Decimal delta) = 0;
-
+    virtual void addHistoryEntry(uint64_t accountId, Decimal amount, const std::string& reason, std::optional<uint64_t> referenceId) = 0;
+    virtual uint64_t getAccountIdByUserId(uint64_t userId) = 0;
     virtual std::optional<Position> getPosition(UserId userId, InstrumentId instrumentId) = 0;
     virtual void updatePosition(UserId userId, InstrumentId instrumentId, Decimal quantityDelta, Decimal price) = 0;
     virtual std::vector<Position> getPositions(UserId userId) = 0;
-};
-
-class InMemoryAccountRepository : public IAccountRepository {
-public:
-    // --- Деньги ---
-    Decimal getBalance(UserId userId) override {
-        std::lock_guard lock(m_mutex);
-        return m_balances[userId];
-    }
-
-    void updateBalance(UserId userId, Decimal newBalance) override {
-        std::lock_guard lock(m_mutex);
-        m_balances[userId] = newBalance;
-    }
-
-    // --- Позиции ---
-    std::optional<Position> getPosition(UserId userId, InstrumentId instrumentId) override {
-        std::lock_guard lock(m_mutex);
-        auto it = m_positions[userId].find(instrumentId);
-        if (it == m_positions[userId].end()) return std::nullopt;
-        return it->second;
-    }
-
-    void updatePosition(UserId userId, InstrumentId instrumentId, Decimal quantityDelta, Decimal price) override {
-        std::lock_guard lock(m_mutex);
-        auto& pos = m_positions[userId][instrumentId];
-
-        pos.instrument_id = instrumentId;
-
-        // Логика обновления средней цены при покупке
-        if (quantityDelta > Decimal{0,0}) {
-            Decimal totalCost = (pos.average_price * pos.quantity) + (price * quantityDelta);
-            pos.quantity += quantityDelta;
-            pos.average_price = totalCost / pos.quantity; // Убедись, что оператор / перегружен
-        } else {
-            // При продаже средняя цена обычно не меняется, просто уменьшается количество
-            pos.quantity += quantityDelta;
-        }
-
-        // Если количество стало 0, можно либо оставить запись, либо удалить
-        if (pos.quantity == Decimal{0,0}) {
-            m_positions[userId].erase(instrumentId);
-        }
-    }
-
-    std::vector<Position> getPositions(UserId userId) override {
-        std::lock_guard lock(m_mutex);
-        std::vector<Position> result;
-        for (const auto& [id, pos] : m_positions[userId]) {
-            result.push_back(pos);
-        }
-        return result;
-    }
-
-    void changeBalance(UserId userId, Decimal delta) {
-        std::lock_guard lock(m_mutex);
-        m_balances[userId] += delta;
-    }
-
-private:
-    mutable std::mutex m_mutex;
-    std::unordered_map<UserId, Decimal> m_balances;
-    // Карта: UserId -> (InstrumentId -> Position)
-    std::unordered_map<UserId, std::unordered_map<InstrumentId, Position>> m_positions;
 };
 
 class MySqlAccountRepository : public IAccountRepository {
@@ -95,6 +32,67 @@ private:
     Decimal fromSql(const std::string& s) const { return decimalFromSql(s); }
 
 public:
+    uint64_t getAccountIdByUserId(uint64_t userId) {
+        try {
+            std::unique_ptr<sql::PreparedStatement> pstmt(m_conn->prepareStatement(
+                "SELECT id FROM accounts WHERE user_id = ?"
+            ));
+            pstmt->setUInt64(1, userId);
+
+            std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+
+            if (res->next()) {
+                return res->getUInt64("id");
+            } else {
+                // Если аккаунта нет (чего не должно быть из-за триггера), выбрасываем исключение
+                throw std::runtime_error("Account not found for user_id: " + std::to_string(userId));
+            }
+        } catch (sql::SQLException& e) {
+            throw std::runtime_error("DB Error in getAccountIdByUserId: " + std::string(e.what()));
+        }
+    }
+
+    void addHistoryEntry(
+    uint64_t accountId,
+    Decimal amount,
+    const std::string& reason,
+    std::optional<uint64_t> referenceId)
+    {
+        try {
+            // Готовим запрос. Поля: account_id, change_amount, reason, reference_id
+            std::unique_ptr<sql::PreparedStatement> pstmt(m_conn->prepareStatement(
+                "INSERT INTO balance_history (account_id, change_amount, reason, reference_id) "
+                "VALUES (?, ?, ?, ?)"
+            ));
+
+            // 1. ID аккаунта
+            pstmt->setUInt64(1, accountId);
+
+            // 2. Сумма изменения.
+            // Преобразуем твой Decimal (units/nanos) в строку "units.nanos",
+            // чтобы MySQL корректно сохранил его в DECIMAL(18,8)
+            std::string amountStr = amount.toString();
+            pstmt->setString(2, amountStr);
+
+            // 3. Причина (ENUM: 'TRADE','DEPOSIT','WITHDRAWAL','FEE')
+            // Важно, чтобы строка точно совпадала с определением в SQL
+            pstmt->setString(3, reason);
+
+            // 4. Ссылка на связанную сущность (например, ID сделки)
+            if (referenceId.has_value()) {
+                pstmt->setUInt64(4, referenceId.value());
+            } else {
+                // Если ссылки нет, записываем NULL
+                pstmt->setNull(4, sql::DataType::BIGINT);
+            }
+
+            pstmt->executeUpdate();
+
+        } catch (sql::SQLException& e) {
+            // Здесь стоит добавить логирование, например через spdlog
+            throw std::runtime_error("Failed to add balance history: " + std::string(e.what()));
+        }
+    }
     explicit MySqlAccountRepository(std::shared_ptr<sql::Connection> conn)
         : m_conn(conn) {}
 
