@@ -1,0 +1,8 @@
+//
+// Created by ADMIN on 20.04.2026.
+//
+
+#ifndef PLATFORM_PROTOMAPPER_H
+#define PLATFORM_PROTOMAPPER_H
+
+#endif //PLATFORM_PROTOMAPPER_H
