@@ -13,4 +13,4 @@ add_executable(${PROJECT_NAME}
         utils/ProtoMapper.h
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE Core proto_generated)
+target_link_libraries(${PROJECT_NAME} PRIVATE Core proto_generated common)

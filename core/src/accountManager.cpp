@@ -50,3 +50,13 @@ AccountManager::withdraw(const WithdrawCommand& cmd) {
     m_accounts->addHistoryEntry(accId, cmd.amount, "DEPOSIT", std::nullopt);
     return {};
 }
+
+std::expected<std::vector<BalanceHistoryEntry>, BalanceError>
+AccountManager::getBalanceHistory(UserId id) const {
+    try {
+        uint64_t accId = m_accounts->getAccountIdByUserId(id);
+        return m_accounts->getHistory(accId);
+    } catch (...) {
+        return std::unexpected(BalanceError::InvalidUser);
+    }
+}

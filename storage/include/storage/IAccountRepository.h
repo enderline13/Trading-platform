@@ -10,6 +10,13 @@
 #include "common/Position.h"
 #include "DatabaseManager.h"
 
+struct BalanceHistoryEntry {
+    Decimal change_amount;
+    std::string reason;
+    std::optional<uint64_t> reference_id;
+    // Можно добавить timestamp, если нужно
+};
+
 class IAccountRepository {
 public:
     virtual ~IAccountRepository() = default;
@@ -22,6 +29,7 @@ public:
     virtual std::optional<Position> getPosition(UserId userId, InstrumentId instrumentId) = 0;
     virtual void updatePosition(UserId userId, InstrumentId instrumentId, Decimal quantityDelta, Decimal price) = 0;
     virtual std::vector<Position> getPositions(UserId userId) = 0;
+    virtual std::vector<BalanceHistoryEntry> getHistory(uint64_t accountId) = 0;
 };
 
 class MySqlAccountRepository : public IAccountRepository {
@@ -32,6 +40,49 @@ private:
     Decimal fromSql(const std::string& s) const { return decimalFromSql(s); }
 
 public:
+    std::vector<BalanceHistoryEntry> getHistory(uint64_t accountId) override {
+        std::vector<BalanceHistoryEntry> history;
+
+        try {
+            std::unique_ptr<sql::PreparedStatement> pstmt(m_conn->prepareStatement(
+                "SELECT change_amount, reason, reference_id "
+                "FROM balance_history "
+                "WHERE account_id = ? "
+                "ORDER BY created_at DESC "
+                "LIMIT 100" // Ограничим выборку для производительности
+            ));
+
+            pstmt->setUInt64(1, accountId);
+
+            std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+
+            while (res->next()) {
+                BalanceHistoryEntry entry;
+
+                // 1. Парсим сумму
+                entry.change_amount = fromSql(res->getString("change_amount"));
+
+                // 2. Причина (строка из ENUM)
+                entry.reason = res->getString("reason");
+
+                // 3. Обработка опционального reference_id
+                if (!res->isNull("reference_id")) {
+                    entry.reference_id = res->getUInt64("reference_id");
+                } else {
+                    entry.reference_id = std::nullopt;
+                }
+
+                history.push_back(std::move(entry));
+            }
+
+        } catch (sql::SQLException& e) {
+            // Логируем ошибку и пробрасываем дальше или возвращаем пустой вектор
+            throw std::runtime_error("DB Error in getHistory: " + std::string(e.what()));
+        }
+
+        return history;
+    }
+
     uint64_t getAccountIdByUserId(uint64_t userId) {
         try {
             std::unique_ptr<sql::PreparedStatement> pstmt(m_conn->prepareStatement(

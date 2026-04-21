@@ -70,7 +70,7 @@ message Trade {
 }
 
 message Position {
-  int64 instrument_id = 1;
+  uint64 instrument_id = 1;
   Decimal quantity = 2;
   Decimal average_price = 3;
 }

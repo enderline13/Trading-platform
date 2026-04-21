@@ -26,6 +26,13 @@ public:
     std::expected<UserId, AuthError> registerUser(const RegisterCommand& cmd) {
         return auth.registerUser(cmd);
     }
+    std::expected<User, AuthError> getUser(UserId id) const {
+        return auth.getUser(id);
+    }
+
+    std::expected<std::vector<BalanceHistoryEntry>, BalanceError> getBalanceHistory(UserId id) const {
+        return account.getBalanceHistory(id);
+    }
 
     std::expected<Token, AuthError> login(const LoginCommand& cmd) {
         return auth.login(cmd);
