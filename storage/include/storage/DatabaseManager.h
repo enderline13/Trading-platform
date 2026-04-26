@@ -7,7 +7,7 @@
 #include "jdbc/cppconn/connection.h"
 #include "jdbc/cppconn/driver.h"
 
-class DatabaseManager {
+class DatabaseManager final {
 public:
     static DatabaseManager& instance() {
         static DatabaseManager inst;
@@ -26,6 +26,6 @@ public:
 
 private:
     DatabaseManager() = default;
-    sql::Driver* m_driver;
+    sql::Driver* m_driver = nullptr;
     std::shared_ptr<sql::Connection> m_connection;
 };

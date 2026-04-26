@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "common/Instrument.h"
+#include "utils.h"
 
 class IInstrumentRepository {
 public:
@@ -23,10 +24,10 @@ public:
     MySqlInstrumentRepository(std::shared_ptr<sql::Connection> conn) : m_conn(std::move(conn)) {}
 
     void add(const Instrument& i) override {
-        auto* pstmt = m_conn->prepareStatement(
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
             "INSERT INTO instruments (symbol, name, tick_size, lot_size, is_active) "
             "VALUES (?, ?, ?, ?, ?)"
-        );
+        ));
         pstmt->setString(1, i.symbol);
         pstmt->setString(2, i.name);
         pstmt->setString(3, i.tick_size.toString());
@@ -36,7 +37,7 @@ public:
     }
 
     void update(const Instrument& i) override {
-        const std::unique_ptr<sql::PreparedStatement> pstmt(m_conn->prepareStatement(
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
             "UPDATE instruments SET symbol = ?, name = ?, tick_size = ?, lot_size = ?, is_active = ? "
             "WHERE id = ?"
         ));
@@ -55,10 +56,11 @@ public:
             throw std::runtime_error("Instrument not found with ID: " + std::to_string(i.id));
         }
     }
+
     std::vector<Instrument> getAll() override {
         std::vector<Instrument> result;
-        auto* stmt = m_conn->createStatement();
-        auto* res = stmt->executeQuery("SELECT * FROM instruments");
+        StatementPtr stmt(m_conn->createStatement());
+        ResultSetPtr res(stmt->executeQuery("SELECT * FROM instruments"));
         result.reserve(res->rowsCount());
 
         while (res->next()) {
@@ -76,12 +78,12 @@ public:
     }
 
     std::optional<Instrument> getById(const uint64_t id) override {
-        auto pstmt = m_conn->prepareStatement(
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
           "SELECT id, symbol, name, tick_size, lot_size, is_active FROM instruments WHERE id = ?"
-        );
+        ));
 
         pstmt->setUInt64(1, id);
-        auto res = pstmt->executeQuery();
+        ResultSetPtr res(pstmt->executeQuery());
 
         if (!res->next()) {
             return std::nullopt;

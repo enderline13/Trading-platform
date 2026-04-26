@@ -25,9 +25,9 @@ public:
     explicit MySqlOrderRepository(std::shared_ptr<sql::Connection> conn) : m_conn(std::move(conn)) {}
 
     void updateStatus(const OrderId id, const Order::Status status, const Decimal remainingQty) override {
-        auto* pstmt = m_conn->prepareStatement(
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
             "UPDATE orders SET status = ?, remaining_quantity = ? WHERE id = ?"
-        );
+        ));
 
         pstmt->setString(1, orderStatusToString(status));
         pstmt->setString(2, decimalToSql(remainingQty));
@@ -37,10 +37,10 @@ public:
     }
 
     OrderId create(const Order& order) override {
-        auto pstmt = m_conn->prepareStatement(
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
             "INSERT INTO orders (user_id, instrument_id, type, side, price, quantity, remaining_quantity, status) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-        );
+        ));
         pstmt->setUInt64(1, order.user_id);
         pstmt->setUInt64(2, order.instrument_id);
         pstmt->setString(3, orderTypeToString(order.type));
@@ -52,16 +52,18 @@ public:
 
         pstmt->executeUpdate();
 
-        auto* res = m_conn->createStatement()->executeQuery("SELECT LAST_INSERT_ID()");
-        res->next();
-        return res->getUInt64(1);
+        if (ResultSetPtr res(m_conn->createStatement()->executeQuery("SELECT LAST_INSERT_ID()")); res->next()) {
+            return res->getUInt64(1);
+        }
+
+        throw std::runtime_error("Failed to retrieve last insert ID for order");
     }
 
     std::optional<Order> get(const OrderId id) override {
-        auto* pstmt = m_conn->prepareStatement("SELECT * FROM orders WHERE id = ?");
+        PrepStatementPtr pstmt(m_conn->prepareStatement("SELECT * FROM orders WHERE id = ?"));
         pstmt->setUInt64(1, id);
 
-        if (auto* res = pstmt->executeQuery(); res->next()) {
+        if (ResultSetPtr res(pstmt->executeQuery()); res->next()) {
             return Order{
                 res->getUInt64("id"),
                 res->getUInt64("user_id"),
@@ -78,9 +80,9 @@ public:
     }
 
     void update(const Order& order) override {
-        auto pstmt = m_conn->prepareStatement(
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
             "UPDATE orders SET remaining_quantity = ?, status = ? WHERE id = ?"
-        );
+        ));
         pstmt->setString(1, decimalToSql(order.remaining_quantity));
         pstmt->setString(2, orderStatusToString(order.status));
         pstmt->setUInt64(3, order.id);
@@ -88,11 +90,13 @@ public:
     }
 
     std::vector<Order> getByUser(const UserId userId) override {
-        auto pstmt = m_conn->prepareStatement("SELECT * FROM orders WHERE user_id = ?");
+        PrepStatementPtr pstmt(m_conn->prepareStatement("SELECT * FROM orders WHERE user_id = ?"));
         pstmt->setUInt64(1, userId);
-        auto res = pstmt->executeQuery();
+        ResultSetPtr res(pstmt->executeQuery());
 
         std::vector<Order> orders;
+        orders.reserve(res->rowsCount());
+
         while (res->next()) {
             orders.push_back(Order{
                 res->getUInt64("id"),

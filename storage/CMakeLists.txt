@@ -8,22 +8,17 @@ set(HEADERS
         include/storage/IAccountRepository.h
         include/storage/ITradeRepository.h
         include/storage/IUserRepository.h
+        include/storage/IInstrumentRepository.h
         include/storage/DatabaseManager.h
-)
-
-set(SOURCES
-        src/mysql_account_repository.cpp
-        src/mysql_order_repository.cpp
-        src/mysql_trade_repository.cpp
-        src/mysql_user_repository.cpp
+        include/storage/utils.h
 )
 
 find_package(mysql-concpp REQUIRED)
 
-add_library(${PROJECT_NAME} STATIC ${SOURCES} ${HEADERS})
+add_library(${PROJECT_NAME} INTERFACE)
 
-target_link_libraries(${PROJECT_NAME} PUBLIC mysql::concpp-jdbc)
+target_link_libraries(${PROJECT_NAME} INTERFACE mysql::concpp-jdbc)
 
-target_include_directories(${PROJECT_NAME} PUBLIC include/)
+target_include_directories(${PROJECT_NAME} INTERFACE include/)
 
-target_link_libraries(${PROJECT_NAME} PUBLIC common)
+target_link_libraries(${PROJECT_NAME} INTERFACE common)

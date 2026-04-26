@@ -6,6 +6,7 @@
 #include "common/Decimal.h"
 #include "common/Position.h"
 #include "DatabaseManager.h"
+#include "utils.h"
 
 struct BalanceHistoryEntry {
     Decimal change_amount;
@@ -59,11 +60,11 @@ public:
     // BALANCE
 
     std::optional<Decimal> getBalance(const UserId userId) override {
-        auto pstmt = m_conn->prepareStatement(
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
             "SELECT balance_cash FROM accounts WHERE user_id = ?"
-        );
+        ));
         pstmt->setUInt64(1, userId);
-        auto res = pstmt->executeQuery();
+        ResultSetPtr res(pstmt->executeQuery());
 
         if (res->next()) {
             return fromSql(res->getString(1));
@@ -72,18 +73,18 @@ public:
     }
 
     void updateBalance(const UserId userId, const Decimal newBalance) override {
-        auto* pstmt = m_conn->prepareStatement(
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
             "UPDATE accounts SET balance_cash = ? WHERE user_id = ?"
-        );
+        ));
         pstmt->setString(1, toSql(newBalance));
         pstmt->setUInt64(2, userId);
         pstmt->executeUpdate();
     }
 
     void changeBalance(const UserId userId, const Decimal delta) override {
-        auto*  pstmt = m_conn->prepareStatement(
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
             "UPDATE accounts SET balance_cash = balance_cash + ? WHERE user_id = ?"
-        );
+        ));
         pstmt->setString(1, toSql(delta));
         pstmt->setUInt64(2, userId);
         pstmt->executeUpdate();
@@ -92,10 +93,10 @@ public:
     // POSITIONS
 
     void addPosition(const uint64_t userId, const uint64_t instId, const Decimal qty) override {
-        auto* pstmt = m_conn->prepareStatement(
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
             "INSERT INTO positions (user_id, instrument_id, quantity) VALUES (?, ?, ?) "
             "ON DUPLICATE KEY UPDATE quantity = quantity + ?"
-        );
+        ));
         pstmt->setUInt64(1, userId);
         pstmt->setUInt64(2, instId);
         pstmt->setString(3, qty.toString());
@@ -104,17 +105,16 @@ public:
     }
 
     std::optional<Position> getPosition(const UserId userId, const InstrumentId instrumentId) override {
-        auto pstmt = m_conn->prepareStatement(
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
             "SELECT p.quantity, p.average_price "
             "FROM positions p "
             "JOIN accounts a ON p.account_id = a.id "
             "WHERE a.user_id = ? AND p.instrument_id = ?"
-        );
+        ));
         pstmt->setUInt64(1, userId);
         pstmt->setUInt64(2, instrumentId);
-        auto res = pstmt->executeQuery();
 
-        if (res->next()) {
+        if (ResultSetPtr res(pstmt->executeQuery()); res->next()) {
             return Position{
                 instrumentId,
                 fromSql(res->getString("quantity")),
@@ -129,7 +129,7 @@ public:
                     const Decimal quantityDelta,
                     const Decimal price) override
     {
-        auto pstmt = m_conn->prepareStatement(
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
             "INSERT INTO positions (account_id, instrument_id, quantity, average_price) "
             "SELECT id, ?, ?, ? FROM accounts WHERE user_id = ? "
             "ON DUPLICATE KEY UPDATE "
@@ -151,10 +151,10 @@ public:
             "ELSE average_price "
 
             "END"
-        );
+        ));
 
-        std::string qStr = toSql(quantityDelta);
-        std::string pStr = toSql(price);
+        const std::string qStr = toSql(quantityDelta);
+        const std::string pStr = toSql(price);
 
         // INSERT
         pstmt->setUInt64(1, instrumentId);
@@ -182,16 +182,18 @@ public:
     }
 
     std::vector<Position> getPositions(const UserId userId) override {
-        auto pstmt = m_conn->prepareStatement(
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
             "SELECT p.instrument_id, p.quantity, p.average_price "
             "FROM positions p "
             "JOIN accounts a ON p.account_id = a.id "
             "WHERE a.user_id = ?"
-        );
+        ));
         pstmt->setUInt64(1, userId);
-        auto res = pstmt->executeQuery();
+        ResultSetPtr res(pstmt->executeQuery());
 
         std::vector<Position> positions;
+        positions.reserve(res->rowsCount());
+
         while (res->next()) {
             positions.push_back({
                 res->getUInt64("instrument_id"),
@@ -199,20 +201,20 @@ public:
                 fromSql(res->getString("average_price"))
             });
         }
+
         return positions;
     }
 
     // SYSTEM STATUS
 
     void setSystemStatus(const bool running) override {
-        auto pstmt = m_conn->prepareStatement("UPDATE system_state SET trading_status = ?, id = 1");
+        PrepStatementPtr pstmt(m_conn->prepareStatement("UPDATE system_state SET trading_status = ?, id = 1"));
         pstmt->setString(1, running ? "RUNNING" : "STOPPED");
         pstmt->executeUpdate();
     }
 
     bool isSystemRunning() override {
-        auto res = m_conn->createStatement()->executeQuery("SELECT trading_status FROM system_state WHERE id = 1");
-        if (res->next()) return res->getString("trading_status") == "RUNNING";
+        if (ResultSetPtr res(m_conn->createStatement()->executeQuery("SELECT trading_status FROM system_state WHERE id = 1")); res->next()) return res->getString("trading_status") == "RUNNING";
         return false;
     }
 
@@ -221,7 +223,7 @@ public:
     std::vector<BalanceHistoryEntry> getHistory(const uint64_t accountId) override {
         std::vector<BalanceHistoryEntry> history;
 
-        std::unique_ptr<sql::PreparedStatement> pstmt(m_conn->prepareStatement(
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
                 "SELECT change_amount, reason, reference_id, created_at "
                 "FROM balance_history "
                 "WHERE account_id = ? "
@@ -230,7 +232,7 @@ public:
 
         pstmt->setUInt64(1, accountId);
 
-        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+        ResultSetPtr res(pstmt->executeQuery());
         history.reserve(res->rowsCount());
 
         while (res->next()) {
@@ -252,7 +254,7 @@ public:
     }
 
     void addHistoryEntry(const uint64_t accountId, const Decimal amount, const std::string& reason, const std::optional<uint64_t> referenceId) override {
-        std::unique_ptr<sql::PreparedStatement> pstmt(m_conn->prepareStatement(
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
                 "INSERT INTO balance_history (account_id, change_amount, reason, reference_id) "
                 "VALUES (?, ?, ?, ?)"));
 
@@ -271,13 +273,11 @@ public:
     // HELPERS
 
     uint64_t getAccountIdByUserId(const uint64_t userId) override {
-        std::unique_ptr<sql::PreparedStatement> pstmt(m_conn->prepareStatement(
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
                 "SELECT id FROM accounts WHERE user_id = ?"));
         pstmt->setUInt64(1, userId);
 
-        std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
-
-        if (res->next()) {
+        if (ResultSetPtr res(pstmt->executeQuery()); res->next()) {
             return res->getUInt64("id");
         }
 
