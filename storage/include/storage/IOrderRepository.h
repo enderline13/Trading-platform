@@ -1,17 +1,16 @@
 #pragma once
 
 #include <optional>
-#include <mutex>
-#include <unordered_map>
 
 #include "mysql/jdbc.h"
 
 #include "common/Types.h"
 #include "common/Order.h"
 
-
 class IOrderRepository {
 public:
+    virtual ~IOrderRepository() = default;
+
     virtual OrderId create(const Order&) = 0;
     virtual std::optional<Order> get(OrderId) = 0;
     virtual std::vector<Order> getByUser(UserId) = 0;
@@ -19,17 +18,17 @@ public:
     virtual void updateStatus(OrderId id, Order::Status status, Decimal remainingQty) = 0;
 };
 
-class MySqlOrderRepository : public IOrderRepository {
+class MySqlOrderRepository final : public IOrderRepository {
     std::shared_ptr<sql::Connection> m_conn;
-public:
-    MySqlOrderRepository(std::shared_ptr<sql::Connection> conn) : m_conn(conn) {}
 
-    void updateStatus(OrderId id, Order::Status status, Decimal remainingQty) override {
-        auto pstmt = m_conn->prepareStatement(
+public:
+    explicit MySqlOrderRepository(std::shared_ptr<sql::Connection> conn) : m_conn(std::move(conn)) {}
+
+    void updateStatus(const OrderId id, const Order::Status status, const Decimal remainingQty) override {
+        auto* pstmt = m_conn->prepareStatement(
             "UPDATE orders SET status = ?, remaining_quantity = ? WHERE id = ?"
         );
 
-        // Преобразуем enum в строку, как он задан в базе (LIMIT, MARKET...)
         pstmt->setString(1, orderStatusToString(status));
         pstmt->setString(2, decimalToSql(remainingQty));
         pstmt->setUInt64(3, id);
@@ -53,17 +52,16 @@ public:
 
         pstmt->executeUpdate();
 
-        auto res = m_conn->createStatement()->executeQuery("SELECT LAST_INSERT_ID()");
+        auto* res = m_conn->createStatement()->executeQuery("SELECT LAST_INSERT_ID()");
         res->next();
         return res->getUInt64(1);
     }
 
-    std::optional<Order> get(OrderId id) override {
-        auto pstmt = m_conn->prepareStatement("SELECT * FROM orders WHERE id = ?");
+    std::optional<Order> get(const OrderId id) override {
+        auto* pstmt = m_conn->prepareStatement("SELECT * FROM orders WHERE id = ?");
         pstmt->setUInt64(1, id);
-        auto res = pstmt->executeQuery();
 
-        if (res->next()) {
+        if (auto* res = pstmt->executeQuery(); res->next()) {
             return Order{
                 res->getUInt64("id"),
                 res->getUInt64("user_id"),
@@ -89,7 +87,7 @@ public:
         pstmt->executeUpdate();
     }
 
-    std::vector<Order> getByUser(UserId userId) override {
+    std::vector<Order> getByUser(const UserId userId) override {
         auto pstmt = m_conn->prepareStatement("SELECT * FROM orders WHERE user_id = ?");
         pstmt->setUInt64(1, userId);
         auto res = pstmt->executeQuery();
@@ -108,8 +106,7 @@ public:
                 stringToOrderStatus(res->getString("status"))
             });
         }
+
         return orders;
     }
-
-    // getByUser реализуется аналогично через SELECT
 };
