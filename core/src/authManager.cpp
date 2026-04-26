@@ -1,10 +1,12 @@
-#include <random>
-
 #include "core/authManager.h"
+
+#include <random>
+#include <mutex>
+
 #include "common/errors.h"
 
 std::string generateRandomToken() {
-    static const char charset[] = "0123456789ABCDEF";
+    static constexpr char charset[] = "0123456789ABCDEF";
     std::string result;
     result.reserve(32);
 
@@ -23,18 +25,17 @@ std::string hashPassword(const std::string& password) {
 }
 
 std::expected<UserId, AuthError>
-AuthManager::registerUser(const RegisterCommand& cmd)
+AuthManager::registerUser(const RegisterCommand& cmd) const
 {
     if (cmd.username.empty() || cmd.password.empty() || cmd.email.empty())
         return std::unexpected(AuthError::InvalidInput);
-
     if (m_users->getByEmail(cmd.email))
         return std::unexpected(AuthError::UserAlreadyExists);
 
     User user;
     user.username = cmd.username;
     user.email = cmd.email;
-    user.password_hash = hashPassword(cmd.password); // Твоя функция хеширования
+    user.password_hash = hashPassword(cmd.password);
 
     return m_users->create(user);
 }
@@ -42,16 +43,13 @@ AuthManager::registerUser(const RegisterCommand& cmd)
 std::expected<Token, AuthError>
 AuthManager::login(const LoginCommand& cmd)
 {
-    auto userOpt = m_users->getByEmail(cmd.username);
-    if (!userOpt) userOpt = m_users->getByUsername(cmd.username);
+    auto userOpt = m_users->getByUsername(cmd.username);
     if (!userOpt) return std::unexpected(AuthError::UserNotFound);
 
     if (userOpt->password_hash != hashPassword(cmd.password))
         return std::unexpected(AuthError::InvalidCredentials);
 
-    // Генерируем токен и сохраняем сессию
     std::string token = generateRandomToken();
-
     {
         std::unique_lock lock(m_sessionMutex);
         m_sessions[token] = userOpt->id;
@@ -66,17 +64,17 @@ AuthManager::validateToken(const Token& token) const
     UserId uid;
     {
         std::shared_lock lock(m_sessionMutex);
-        auto it = m_sessions.find(token);
+        const auto it = m_sessions.find(token);
         if (it == m_sessions.end()) {
             return std::unexpected(AuthError::InvalidToken);
         }
         uid = it->second;
     }
 
-    auto userOpt = m_users->getById(uid);
-    if (!userOpt) return std::unexpected(AuthError::UserNotFound);
+    auto user = m_users->getById(uid);
+    if (!user) return std::unexpected(AuthError::UserNotFound);
 
-    return *userOpt;
+    return user.value();
 }
 
 void AuthManager::logout(const Token& token) {
@@ -85,11 +83,11 @@ void AuthManager::logout(const Token& token) {
 }
 
 std::expected<User, AuthError>
-AuthManager::getUser(UserId id) const
+AuthManager::getUser(const UserId id) const
 {
-    auto userOpt = m_users->getById(id);
-    if (!userOpt)
+    auto user = m_users->getById(id);
+    if (!user)
         return std::unexpected(AuthError::UserNotFound);
 
-    return *userOpt;
+    return user.value();
 }
