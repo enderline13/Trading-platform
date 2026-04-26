@@ -55,6 +55,14 @@ OrderBook::processOrder(std::shared_ptr<Order> newOrder)
                 oppQueue.pop();
             } else {
                 top->status = Order::Status::PARTIALLY_FILLED;
+                auto it = std::find_if(result.partial_fills.begin(), result.partial_fills.end(),
+                          [&](const auto& pf) { return pf.order_id == top->id; });
+
+                if (it != result.partial_fills.end()) {
+                    it->remaining_qty = top->remaining_quantity;
+                } else {
+                    result.partial_fills.push_back({top->id, top->remaining_quantity});
+                }
             }
 
             if (newOrder->remaining_quantity == Decimal{0,0}) {
@@ -144,4 +152,9 @@ OrderBook::cancelOrder(OrderId id)
     m_orders.erase(it);
 
     return {};
+}
+
+std::shared_ptr<Order> OrderBook::getOrder(const OrderId id) {
+    if (m_orders.contains(id)) return m_orders[id];
+    return nullptr;
 }

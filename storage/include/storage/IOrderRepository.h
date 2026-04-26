@@ -33,7 +33,9 @@ public:
         pstmt->setString(2, decimalToSql(remainingQty));
         pstmt->setUInt64(3, id);
 
-        pstmt->executeUpdate();
+        if (pstmt->executeUpdate() == 0) {
+            // WARN
+        }
     }
 
     OrderId create(const Order& order) override {

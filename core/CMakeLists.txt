@@ -12,6 +12,7 @@ set(HEADERS
         include/core/authManager.h
         include/core/core.h
         include/core/TransactionGuard.h
+        include/core/adminManager.h
 )
 
 set(SOURCES
@@ -19,6 +20,7 @@ set(SOURCES
         src/accountManager.cpp
         src/authManager.cpp
         include/core/TransactionGuard.h
+        include/core/adminManager.h
 )
 
 add_library(${PROJECT_NAME} STATIC ${SOURCES} ${HEADERS})

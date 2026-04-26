@@ -1,7 +1,9 @@
 #include "matching/matchingEngine.h"
 
+#include <mutex>
+
 std::expected<MatchResult, MatchingError> MatchingEngine::submitOrder(const std::shared_ptr<Order> order) {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    std::scoped_lock lock(m_mutex);
     if (!order) return std::unexpected(MatchingError::EmptyOrder);
 
     auto& book = m_books[order->instrument_id];
@@ -29,7 +31,7 @@ std::expected<MatchResult, MatchingError> MatchingEngine::submitOrder(const std:
 
 std::expected<void, MatchingError>
 MatchingEngine::cancelOrder(const OrderId id) {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    std::scoped_lock lock(m_mutex);
     auto it = m_order_locations.find(id);
     if (it == m_order_locations.end()) {
         return std::unexpected(MatchingError::OrderNotFound);
@@ -47,11 +49,16 @@ MatchingEngine::cancelOrder(const OrderId id) {
 
 std::expected<std::shared_ptr<const OrderBook>, MatchingError>
 MatchingEngine::getOrderBook(InstrumentId id) const {
-    std::lock_guard<std::mutex> lock(m_mutex);
+    std::scoped_lock lock(m_mutex);
     auto it = m_books.find(id);
     if (it == m_books.end()) {
         return std::unexpected(MatchingError::InstrumentNotFound);
     }
 
     return it->second;
+}
+
+std::expected<std::shared_ptr<Order>, MatchingError> MatchingEngine::getOrder(OrderId id) {
+    if (!m_order_locations.contains(id)) return std::unexpected(MatchingError::OrderNotFound);
+    return m_order_locations[id].book->getOrder(id);
 }

@@ -9,6 +9,11 @@
 struct Decimal {
     int64_t units = 0;
     int32_t nanos = 0;
+    Decimal() = default;
+
+    Decimal(int64_t u, int32_t n) : units(u), nanos(n) {
+        normalize();
+    }
 
     auto operator<=>(const Decimal&) const = default;
     static constexpr int32_t kNanoFactor = 1'000'000'000;
@@ -122,12 +127,21 @@ struct Decimal {
     }
 
     std::string toString() const {
-        std::string res = std::format("{}.{:09}", units, std::abs(nanos));
+        bool is_negative = (units < 0 || nanos < 0);
 
-        res.erase(res.find_last_not_of('0') + 1);
-        if (res.back() == '.') res.pop_back();
+        // Работаем с абсолютными значениями для формирования дробной части
+        long long abs_units = std::abs(units);
+        long long abs_nanos = std::abs(nanos);
 
-        return res;
+        std::string s = is_negative ? "-" : "";
+        s += std::to_string(abs_units);
+        s += ".";
+
+        std::string frac = std::to_string(abs_nanos);
+        // Дополняем нулями до 9 знаков
+        s += std::string(9 - frac.length(), '0') + frac;
+
+        return s;
     }
 };
 
@@ -141,3 +155,6 @@ inline std::string decimalToSql(const Decimal& d) {
     // MySQL DECIMAL(18,8) — округляем до 8 знаков или просто выводим как есть
     return d.toString();
 }
+
+inline std::string toSql(const Decimal& d) { return d.toString(); }
+inline Decimal fromSql(const std::string& s) { return decimalFromSql(s); }

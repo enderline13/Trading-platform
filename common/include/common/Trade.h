@@ -3,6 +3,8 @@
 #include "Decimal.h"
 #include "Types.h"
 
+using TradeId = uint64_t;
+
 struct Trade {
     uint64_t id = 0;
     uint64_t instrument_id = 0;

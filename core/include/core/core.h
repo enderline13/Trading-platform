@@ -3,6 +3,7 @@
 #include "accountManager.h"
 #include "authManager.h"
 #include "tradingCore.h"
+#include "adminManager.h"
 #include "storage/IAccountRepository.h"
 #include "storage/IUserRepository.h"
 #include "storage/ITradeRepository.h"
@@ -17,11 +18,12 @@ public:
             std::shared_ptr<IOrderRepository> orders,
             std::shared_ptr<ITradeRepository> trades,
             std::shared_ptr<IAccountRepository> accounts,
+            std::shared_ptr<IInstrumentRepository> instruments,
             std::shared_ptr<MatchingEngine> matching
         )
             : m_conn(conn), auth(conn, users),
-              trading(conn, orders, trades, accounts, matching),
-              account(conn, accounts) {}
+              trading(conn, orders, trades, accounts, instruments, matching),
+              account(conn, accounts), admin(conn, instruments, accounts) {}
 
     std::expected<UserId, AuthError> registerUser(const RegisterCommand& cmd) {
         return auth.registerUser(cmd);
@@ -75,10 +77,36 @@ public:
     std::expected<void, BalanceError> withdraw(const WithdrawCommand& cmd) {
         return account.withdraw(cmd);
     }
+
+    void addInstrument(const Instrument& i) {
+        return admin.addInstrument(i);
+    }
+
+    void updateInstrument(const Instrument& i) {
+        admin.updateInstrument(i);
+    }
+
+    void fundUser(UserId id, Decimal amount) {
+       return admin.fundUser(id, amount);
+    }
+
+    admin::SystemStatus getSystemStatus() {
+      return admin.getSystemStatus();
+    }
+
+    std::vector<Instrument> getAllInstruments() const {
+        return trading.getAllInstruments();
+    }
+
+    std::optional<Order> getOrder(uint64_t orderId) const {
+        return trading.getOrder(orderId);
+    }
+
 private:
     std::shared_ptr<sql::Connection> m_conn;
 
     AuthManager auth;
     TradingCore trading;
     AccountManager account;
+    AdminManager admin;
 };

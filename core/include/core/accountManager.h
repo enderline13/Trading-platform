@@ -19,7 +19,7 @@ struct WithdrawCommand {
     Decimal amount;
 };
 
-class AccountManager {
+class AccountManager final {
 public:
     AccountManager(std::shared_ptr<sql::Connection> conn, std::shared_ptr<IAccountRepository> accounts) : m_conn(std::move(conn)), m_accounts(std::move(accounts)) {}
     std::expected<Decimal, BalanceError> getBalance(UserId) const;

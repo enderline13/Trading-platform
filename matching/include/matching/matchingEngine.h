@@ -18,9 +18,9 @@ public:
     std::expected<void, MatchingError> cancelOrder(OrderId id);
 
     std::expected<std::shared_ptr<const OrderBook>, MatchingError> getOrderBook(InstrumentId id) const;
+    std::expected<std::shared_ptr<Order>, MatchingError> getOrder(OrderId id);
 
 private:
-
     std::unordered_map<OrderId, OrderLocation> m_order_locations;
     std::unordered_map<InstrumentId, std::shared_ptr<OrderBook>> m_books;
 

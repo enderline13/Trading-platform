@@ -26,7 +26,7 @@ enum class AuthError {
 enum class BalanceError {
     InvalidUser,
     InvalidAmount,
-    InsuffucientMoney
+    InsufficientMoney
 };
 
 enum class TradingError {
@@ -35,7 +35,7 @@ enum class TradingError {
     InsufficientBalance,
     InsufficientPosition,
     InvalidOrder,
-
+    SystemStopped,
     MatchingFailed,
     OrderNotFound,
     Unauthorized
