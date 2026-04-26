@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "common/Instrument.h"
+#include "common/Types.h"
 #include "utils.h"
 
 class IInstrumentRepository {
@@ -13,7 +14,7 @@ public:
     virtual void add(const Instrument& i) = 0;
     virtual void update(const Instrument& i) = 0;
     virtual std::vector<Instrument> getAll() = 0;
-    virtual std::optional<Instrument> getById(uint64_t id) = 0;
+    virtual std::optional<Instrument> getById(InstrumentId id) = 0;
 };
 
 class MySqlInstrumentRepository final : public IInstrumentRepository {
@@ -77,7 +78,7 @@ public:
         return result;
     }
 
-    std::optional<Instrument> getById(const uint64_t id) override {
+    std::optional<Instrument> getById(const InstrumentId id) override {
         PrepStatementPtr pstmt(m_conn->prepareStatement(
           "SELECT id, symbol, name, tick_size, lot_size, is_active FROM instruments WHERE id = ?"
         ));

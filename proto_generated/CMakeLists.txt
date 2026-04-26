@@ -37,7 +37,7 @@ add_library(${PROJECT_NAME} STATIC
 
 target_link_libraries(${PROJECT_NAME}
         PUBLIC
-        gRPC::grpc++ gRPC::grpc protobuf::protobuf
+        gRPC::grpc++ gRPC::grpc protobuf::protobuf gRPC::grpc++_reflection
 )
 
 target_include_directories(${PROJECT_NAME}

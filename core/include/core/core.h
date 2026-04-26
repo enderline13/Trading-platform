@@ -25,14 +25,14 @@ public:
               trading(conn, orders, trades, accounts, instruments, matching),
               account(conn, accounts), admin(conn, instruments, accounts) {}
 
-    std::expected<UserId, AuthError> registerUser(const RegisterCommand& cmd) {
+    std::expected<UserId, AuthError> registerUser(const RegisterCommand& cmd) const {
         return auth.registerUser(cmd);
     }
-    std::expected<User, AuthError> getUser(UserId id) const {
+    std::expected<User, AuthError> getUser(const UserId id) const {
         return auth.getUser(id);
     }
 
-    std::expected<std::vector<BalanceHistoryEntry>, BalanceError> getBalanceHistory(UserId id) const {
+    std::expected<std::vector<BalanceHistoryEntry>, BalanceError> getBalanceHistory(const UserId id) const {
         return account.getBalanceHistory(id);
     }
 
@@ -45,11 +45,11 @@ public:
     }
 
     // --- Trading API ---
-    std::expected<OrderId, TradingError> placeOrder(const PlaceOrderCommand& cmd) {
+    std::expected<OrderId, TradingError> placeOrder(const PlaceOrderCommand& cmd) const {
         return trading.placeOrder(cmd);
     }
 
-    std::expected<void, TradingError> cancelOrder(const CancelOrderCommand& cmd) {
+    std::expected<void, TradingError> cancelOrder(const CancelOrderCommand& cmd) const {
         return trading.cancelOrder(cmd);
     }
 
@@ -62,19 +62,19 @@ public:
     }
 
     // --- Account API ---
-    std::expected<Decimal, BalanceError> getBalance(UserId id) const {
+    std::expected<Decimal, BalanceError> getBalance(const UserId id) const {
         return account.getBalance(id);
     }
 
-    std::expected<std::vector<Position>, BalanceError> getPositions(UserId id) const {
+    std::expected<std::vector<Position>, BalanceError> getPositions(const UserId id) const {
         return account.getPositions(id);
     }
 
-    std::expected<void, BalanceError> deposit(const DepositCommand& cmd) {
+    std::expected<void, BalanceError> deposit(const DepositCommand& cmd) const {
         return account.deposit(cmd);
     }
 
-    std::expected<void, BalanceError> withdraw(const WithdrawCommand& cmd) {
+    std::expected<void, BalanceError> withdraw(const WithdrawCommand& cmd) const {
         return account.withdraw(cmd);
     }
 
@@ -86,11 +86,11 @@ public:
         admin.updateInstrument(i);
     }
 
-    void fundUser(UserId id, Decimal amount) {
+    void fundUser(const UserId id, const Decimal amount) {
        return admin.fundUser(id, amount);
     }
 
-    admin::SystemStatus getSystemStatus() {
+    admin::SystemStatus getSystemStatus() const {
       return admin.getSystemStatus();
     }
 
@@ -98,7 +98,7 @@ public:
         return trading.getAllInstruments();
     }
 
-    std::optional<Order> getOrder(uint64_t orderId) const {
+    std::expected<Order, TradingError> getOrder(const OrderId orderId) const {
         return trading.getOrder(orderId);
     }
 
