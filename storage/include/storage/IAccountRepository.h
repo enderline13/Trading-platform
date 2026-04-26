@@ -43,7 +43,7 @@ public:
     virtual std::vector<Position> getPositions( UserId userId) = 0;
     virtual void addPosition(uint64_t userId, uint64_t instId, Decimal qty) = 0;
     virtual void addHistoryEntry(uint64_t accountId, Decimal amount, const std::string& reason, std::optional<uint64_t> referenceId) = 0;
-    virtual uint64_t getAccountIdByUserId(uint64_t userId) = 0;
+    virtual AccountId getAccountIdByUserId(uint64_t userId) = 0;
     virtual std::vector<BalanceHistoryEntry> getHistory(uint64_t accountId) = 0;
     virtual void setSystemStatus(bool running) = 0;
     virtual bool isSystemRunning() = 0;
@@ -272,7 +272,7 @@ public:
 
     // HELPERS
 
-    uint64_t getAccountIdByUserId(const uint64_t userId) override {
+    AccountId getAccountIdByUserId(const uint64_t userId) override {
         PrepStatementPtr pstmt(m_conn->prepareStatement(
                 "SELECT id FROM accounts WHERE user_id = ?"));
         pstmt->setUInt64(1, userId);

@@ -21,15 +21,15 @@ struct WithdrawCommand {
 
 class AccountManager {
 public:
-    AccountManager(std::shared_ptr<sql::Connection> conn, std::shared_ptr<IAccountRepository> accounts) : m_conn(conn), m_accounts(accounts) {}
+    AccountManager(std::shared_ptr<sql::Connection> conn, std::shared_ptr<IAccountRepository> accounts) : m_conn(std::move(conn)), m_accounts(std::move(accounts)) {}
     std::expected<Decimal, BalanceError> getBalance(UserId) const;
     std::expected<std::vector<Position>, BalanceError> getPositions(UserId) const;
-    std::expected<void, BalanceError> deposit(const DepositCommand&);
-    std::expected<void, BalanceError> withdraw(const WithdrawCommand&);
+    std::expected<void, BalanceError> deposit(const DepositCommand&) const;
+    std::expected<void, BalanceError> withdraw(const WithdrawCommand&) const;
     std::expected<std::vector<BalanceHistoryEntry>, BalanceError>
     getBalanceHistory(UserId id) const;
+
 private:
     std::shared_ptr<sql::Connection> m_conn;
-
     std::shared_ptr<IAccountRepository> m_accounts;
 };
