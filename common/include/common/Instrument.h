@@ -4,7 +4,7 @@
 #include <string>
 
 struct Instrument {
-    int64_t id = 0;
+    uint64_t id = 0;
     std::string symbol;
     std::string name;
     Decimal tick_size;
