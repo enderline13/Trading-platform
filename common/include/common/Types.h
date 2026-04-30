@@ -10,3 +10,6 @@ using AccountId = uint64_t;
 
 using Timestamp = std::chrono::system_clock::time_point;
 
+using Token = std::string;
+using Token_view = std::string_view;
+

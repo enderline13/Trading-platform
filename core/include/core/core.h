@@ -40,7 +40,7 @@ public:
         return auth.login(cmd);
     }
 
-    std::expected<User, AuthError> validateToken(const Token& token) const {
+    std::expected<User, AuthError> validateToken(const Token_view& token) const {
         return auth.validateToken(token);
     }
 
