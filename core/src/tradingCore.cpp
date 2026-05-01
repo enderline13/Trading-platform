@@ -2,7 +2,7 @@
 
 #include "core/TransactionGuard.h"
 
-std::expected<OrderId, TradingError>
+std::expected<PlaceOrderResult, TradingError>
 TradingCore::placeOrder(const PlaceOrderCommand& cmd) const
 {
     TransactionGuard tx(m_conn);
@@ -80,7 +80,7 @@ TradingCore::placeOrder(const PlaceOrderCommand& cmd) const
     m_orders->update(order);
 
     tx.commit();
-    return id;
+    return PlaceOrderResult{id, order.status};
 }
 
 std::vector<Instrument> TradingCore::getAllInstruments() const {
@@ -123,14 +123,16 @@ TradingCore::getUserOrders(const GetOrdersQuery& query) const
 
     std::vector<Order> result;
 
-    for (const auto& o : orders) {
-        if (query.status && o.status != query.status.value())
-            continue;
-        if (query.instrument_id && o.instrument_id != query.instrument_id.value())
-            continue;
+    auto filtered = orders
+        | std::views::filter([&](const Order& o) {
+            if (query.status && o.status != query.status.value())
+                return false;
+            if (query.instrument_id && o.instrument_id != query.instrument_id.value())
+                return false;
+            return true;
+        });
 
-        result.push_back(o);
-    }
+    std::ranges::copy(filtered, std::back_inserter(result));
 
     return result;
 }

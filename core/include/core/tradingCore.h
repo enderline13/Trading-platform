@@ -39,6 +39,11 @@ struct GetTradesQuery {
     std::optional<InstrumentId> instrument_id = std::nullopt;
 };
 
+struct PlaceOrderResult {
+    OrderId id;
+    Order::Status status;
+};
+
 class TradingCore final {
 public:
     TradingCore(std::shared_ptr<sql::Connection> conn, std::shared_ptr<IOrderRepository> orders,
@@ -46,7 +51,7 @@ public:
             std::shared_ptr<IAccountRepository> accounts, std::shared_ptr<IInstrumentRepository> instruments,
             std::shared_ptr<MatchingEngine> matching) : m_conn(std::move(conn)), m_orders(std::move(orders)), m_trades(std::move(trades)), m_accounts(std::move(accounts)), m_matching(std::move(matching)), m_instruments(std::move(instruments)) {}
 
-    std::expected<OrderId, TradingError> placeOrder(const PlaceOrderCommand&) const;
+    std::expected<PlaceOrderResult, TradingError> placeOrder(const PlaceOrderCommand&) const;
     std::expected<void, TradingError> cancelOrder(const CancelOrderCommand&) const;
     std::expected<std::vector<Order>, TradingError> getUserOrders(const GetOrdersQuery&) const;
     std::expected<std::vector<Trade>, TradingError> getTradeHistory(const GetTradesQuery&) const;

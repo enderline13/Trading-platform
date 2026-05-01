@@ -1,107 +1,140 @@
 #include "trading.grpc.pb.h"
 #include "core/core.h"
 #include "../utils/ProtoMapper.h"
+#include "../utils/Authenticate.h"
 
 class TradingServiceImpl final : public trading::TradingService::Service {
 private:
     std::shared_ptr<Core> m_core;
 
-    // Вспомогательный метод для получения UserId (аналогично AccountService)
-    std::expected<UserId, grpc::Status> getAuthorizedUserId(grpc::ServerContext* context) const {
-        auto metadata = context->client_metadata();
-        auto it = metadata.find("authorization");
-        if (it == metadata.end()) return std::unexpected(grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "No token"));
-
-        auto user = m_core->validateToken(std::string(it->second.data(), it->second.length()));
-        if (!user) return std::unexpected(grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "Session expired"));
-        return user->id;
-    }
-
 public:
-    explicit TradingServiceImpl(std::shared_ptr<Core> core) : m_core(core) {}
+    explicit TradingServiceImpl(std::shared_ptr<Core> core) : m_core(std::move(core)) {}
 
-    // 1. Размещение ордера
     grpc::Status PlaceOrder(grpc::ServerContext* context,
                            const trading::PlaceOrderRequest* request,
                            trading::PlaceOrderResponse* response) override
     {
-        auto userId = getAuthorizedUserId(context);
-        if (!userId) return userId.error();
+        try {
+            auto user = authenticate(context, m_core);
+            if (!user) return user.error();
+            const auto userId = user.value().id;
 
-        PlaceOrderCommand cmd;
-        cmd.user_id = *userId;
-        cmd.instrument_id = request->instrument_id();
-        cmd.side = mapper::fromProto(request->side());
-        cmd.type = mapper::fromProto(request->type());
-        cmd.price = mapper::fromProto(request->price());
-        cmd.quantity = mapper::fromProto(request->quantity());
+            PlaceOrderCommand cmd;
+            cmd.user_id = userId;
+            cmd.instrument_id = request->instrument_id();
+            cmd.side = mapper::fromProto(request->side());
+            cmd.type = mapper::fromProto(request->type());
+            cmd.price = mapper::fromProto(request->price());
+            cmd.quantity = mapper::fromProto(request->quantity());
 
-        auto result = m_core->placeOrder(cmd);
-        if (!result) {
-            return grpc::Status(grpc::StatusCode::FAILED_PRECONDITION, "Order rejected");
+            const auto result = m_core->placeOrder(cmd);
+            if (!result) {
+                return {grpc::StatusCode::FAILED_PRECONDITION, "Order rejected"};
+            }
+
+            response->set_order_id(result.value().id);
+            response->set_status(mapper::toProto(result.value().status));
+            return grpc::Status::OK;
         }
-
-        response->set_order_id(*result);
-        response->set_status(common::Order_OrderStatus_NEW);
-        return grpc::Status::OK;
+        catch (...) {
+            return {grpc::StatusCode::INTERNAL, "Unknown internal error"};
+        }
     }
 
-    // 2. Отмена ордера
     grpc::Status CancelOrder(grpc::ServerContext* context,
                             const trading::OrderID* request,
                             trading::CancelOrderResponse* response) override
     {
-        auto userId = getAuthorizedUserId(context);
-        if (!userId) return userId.error();
+        try {
+            auto user = authenticate(context, m_core);
+            if (!user) return user.error();
+            const auto userId = user.value().id;
 
-        CancelOrderCommand cmd{*userId, request->order_id()};
-        auto result = m_core->cancelOrder(cmd);
+            const CancelOrderCommand cmd{userId, request->order_id()};
 
-        if (!result) return grpc::Status(grpc::StatusCode::NOT_FOUND, "Order not found or already filled");
+            if (const auto result = m_core->cancelOrder(cmd); !result)
+                return {grpc::StatusCode::NOT_FOUND, "Order not found or already filled"};
 
-        response->set_status(common::Order_OrderStatus_CANCELED);
-        return grpc::Status::OK;
+            response->set_status(common::Order_OrderStatus_CANCELED);
+            return grpc::Status::OK;
+        }
+        catch (...) {
+            return {grpc::StatusCode::INTERNAL, "Unknown internal error"};
+        }
     }
 
-    // 3. Получение списка ордеров пользователя
     grpc::Status GetOrders(grpc::ServerContext* context,
                           const trading::GetOrdersRequest* request,
                           trading::Orders* response) override
     {
-        auto userId = getAuthorizedUserId(context);
-        if (!userId) return userId.error();
+        try {
+            auto user = authenticate(context, m_core);
+            if (!user) return user.error();
+            const auto userId = user.value().id;
 
-        GetOrdersQuery query;
-        query.user_id = *userId;
-        if (request->has_instrument_id()) query.instrument_id = request->instrument_id();
-        // Здесь можно добавить фильтрацию по статусу, если Core её поддерживает
+            GetOrdersQuery query;
+            query.user_id = userId;
+            if (request->has_instrument_id()) query.instrument_id = request->instrument_id();
+            if (request->has_status()) query.status = mapper::fromProto(request->status());
 
-        auto orders = m_core->getUserOrders(query);
-        if (!orders) return grpc::Status(grpc::StatusCode::INTERNAL, "Fetch failed");
+            const auto orders = m_core->getUserOrders(query);
+            if (!orders) return {grpc::StatusCode::INTERNAL, "Fetch orders failed"};
 
-        for (const auto& o : *orders) {
-            *response->add_orders() = mapper::toProto(o);
+            for (const auto& o : orders.value()) {
+                *response->add_orders() = mapper::toProto(o);
+            }
+            return grpc::Status::OK;
         }
-        return grpc::Status::OK;
+        catch (...) {
+            return {grpc::StatusCode::INTERNAL, "Unknown internal error"};
+        }
     }
 
-    // 4. История сделок пользователя
     grpc::Status GetTradeHistory(grpc::ServerContext* context,
-                                const google::protobuf::Empty* request,
+                                const trading::TradeHistoryRequest* request,
                                 trading::Trades* response) override
     {
-        auto userId = getAuthorizedUserId(context);
-        if (!userId) return userId.error();
+        try {
+            auto user = authenticate(context, m_core);
+            if (!user) return user.error();
+            const auto userId = user.value().id;
 
-        GetTradesQuery query;
-        query.user_id = *userId;
+            GetTradesQuery query;
+            query.user_id = userId;
+            if (request->has_instrument_id()) query.instrument_id = request->instrument_id();
 
-        auto trades = m_core->getTradeHistory(query);
-        if (!trades) return grpc::Status(grpc::StatusCode::INTERNAL, "Fetch failed");
+            const auto trades = m_core->getTradeHistory(query);
+            if (!trades) return {grpc::StatusCode::INTERNAL, "Fetch failed"};
 
-        for (const auto& t : *trades) {
-            *response->add_trades() = mapper::toProto(t);
+            for (const auto& t : trades.value()) {
+                *response->add_trades() = mapper::toProto(t);
+            }
+            return grpc::Status::OK;
         }
-        return grpc::Status::OK;
+        catch (...) {
+            return {grpc::StatusCode::INTERNAL, "Unknown internal error"};
+        }
+    }
+
+    grpc::Status GetOrder(grpc::ServerContext* context,
+                                         const trading::OrderID* request,
+                                         common::Order* response) override {
+        try {
+            auto auth = authenticate(context, m_core);
+            if (!auth) return auth.error();
+
+            const auto order = m_core->getOrder(request->order_id());
+            if (!order) return {grpc::StatusCode::NOT_FOUND, "Order not found"};
+
+            if (order->user_id != auth->id) {
+                return {grpc::StatusCode::PERMISSION_DENIED, "Access denied"};
+            }
+
+            *response = mapper::toProto(*order);
+            return grpc::Status::OK;
+        }
+        catch (...) {
+            return {grpc::StatusCode::INTERNAL, "Unknown internal error"};
+        }
     }
 };

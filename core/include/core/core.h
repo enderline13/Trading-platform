@@ -45,7 +45,7 @@ public:
     }
 
     // --- Trading API ---
-    std::expected<OrderId, TradingError> placeOrder(const PlaceOrderCommand& cmd) const {
+    std::expected<PlaceOrderResult, TradingError> placeOrder(const PlaceOrderCommand& cmd) const {
         return trading.placeOrder(cmd);
     }
 
@@ -100,6 +100,14 @@ public:
 
     std::expected<Order, TradingError> getOrder(const OrderId orderId) const {
         return trading.getOrder(orderId);
+    }
+
+    void setSystemState(const bool running) {
+        admin.setSystemState(running);
+    }
+
+    void AddPosition(const AddPositionRequest& request) const {
+        admin.AddPosition(request);
     }
 
 private:

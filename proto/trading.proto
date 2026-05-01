@@ -49,20 +49,23 @@ message Trades {
   repeated common.Trade trades = 1;
 }
 
+message TradeHistoryRequest {
+  optional uint64 instrument_id = 1;
+}
+
+message InstrumentsList { repeated common.Instrument instruments = 1; }
+
 service TradingService {
 
   rpc PlaceOrder(PlaceOrderRequest)
       returns (PlaceOrderResponse);
-
   rpc CancelOrder(OrderID)
       returns (CancelOrderResponse);
 
   rpc GetOrders(GetOrdersRequest)
       returns (Orders);
-
   rpc GetOrder(OrderID)
       returns (common.Order);
-
-  rpc GetTradeHistory(google.protobuf.Empty)
+  rpc GetTradeHistory(TradeHistoryRequest)
       returns (Trades);
 }

@@ -1,6 +1,13 @@
 #pragma once
 #include "common.grpc.pb.h"
+#include "admin.pb.h"
+#include "trading.pb.h"
+#include "common.pb.h"
 #include <google/protobuf/util/time_util.h>
+
+#include "common/Instrument.h"
+#include "common/Order.h"
+
 namespace mapper {
 
     inline common::Decimal toProto(const Decimal& d) {
@@ -13,7 +20,29 @@ namespace mapper {
         Decimal d;
         d.units = pd.units();
         d.nanos = pd.nanos();
+        d.normalize();
         return d;
+    }
+    inline Instrument fromProto(const common::Instrument& pi) {
+        Instrument i;
+        i.id = pi.id();
+        i.symbol = pi.symbol();
+        i.name = pi.name();
+        i.tick_size = fromProto(pi.tick_size());
+        i.lot_size = fromProto(pi.lot_size());
+        i.is_active = pi.is_active();
+        return i;
+    }
+
+    inline common::Instrument toProto(const Instrument& i) {
+        common::Instrument pi;
+        pi.set_id(i.id);
+        pi.set_symbol(i.symbol);
+        pi.set_name(i.name);
+        *pi.mutable_tick_size() = toProto(i.tick_size);
+        *pi.mutable_lot_size() = toProto(i.lot_size);
+        pi.set_is_active(i.is_active);
+        return pi;
     }
 
     inline common::Position toProto(const Position& cp) {
@@ -32,12 +61,54 @@ namespace mapper {
         return p;
     }
 
+    inline auth::User::Role toProtoRole(const User::Role role) {
+        switch (role) {
+            case User::Role::USER:  return auth::User::USER;
+            case User::Role::ADMIN: return auth::User::ADMIN;
+        }
+
+        return auth::User::USER;
+    }
+
     inline auth::User toProto(const User& u) {
         auth::User pu;
         pu.set_id(u.id);
         pu.set_username(u.username);
         pu.set_email(u.email);
+        pu.set_role(toProtoRole(u.role));
         return pu;
+    }
+
+    AddPositionRequest fromProto(const admin::AddPositionRequest& req) {
+        return {
+            .user_id = req.user_id(),
+            .instrument_id = req.instrument_id(),
+            .quantity = fromProto(req.quantity())
+        };
+    }
+
+    inline common::Order::OrderStatus toProto(const Order::Status status) {
+        switch (status) {
+            case Order::Status::NEW:  return common::Order::NEW;
+            case Order::Status::PARTIALLY_FILLED:  return common::Order::PARTIALLY_FILLED;
+            case Order::Status::FILLED:  return common::Order::FILLED;
+            case Order::Status::CANCELED:  return common::Order::CANCELED;
+            case Order::Status::REJECTED:  return common::Order::REJECTED;
+        }
+
+        return common::Order::NEW;
+    }
+
+    inline const Order::Status fromProto(const common::Order::OrderStatus status ) {
+        switch (status) {
+            case common::Order::OrderStatus::Order_OrderStatus_NEW:  return Order::Status::NEW;
+            case common::Order::OrderStatus::Order_OrderStatus_CANCELED:  return Order::Status::CANCELED;
+            case common::Order::OrderStatus::Order_OrderStatus_REJECTED:  return Order::Status::REJECTED;
+            case common::Order::OrderStatus::Order_OrderStatus_FILLED:  return Order::Status::FILLED;
+            case common::Order::OrderStatus::Order_OrderStatus_PARTIALLY_FILLED:  return Order::Status::PARTIALLY_FILLED;
+        }
+
+        return Order::Status::NEW;
     }
 
     using google::protobuf::util::TimeUtil;
