@@ -6,6 +6,21 @@ std::expected<PlaceOrderResult, TradingError>
 TradingCore::placeOrder(const PlaceOrderCommand& cmd) const
 {
     TransactionGuard tx(m_conn);
+
+    auto instruments = m_instruments->getById(cmd.instrument_id);
+    if (!instruments) return std::unexpected(TradingError::InstrumentNotFound);
+    const auto& config = instruments.value();
+
+    if (cmd.quantity <= Decimal(0,0) || (cmd.quantity % config.lot_size) != Decimal(0,0)) {
+        return std::unexpected(TradingError::InvalidLotSize);
+    }
+
+    if (cmd.type == Order::Type::LIMIT) {
+        if (cmd.price <= Decimal(0,0) || (cmd.price % config.tick_size) != Decimal(0,0)) {
+            return std::unexpected(TradingError::InvalidTickSize);
+        }
+    }
+
     if (!m_accounts->isSystemRunning()) return std::unexpected(TradingError::SystemStopped);
     if (cmd.quantity <= Decimal(0,0)) return std::unexpected(TradingError::InvalidOrder);
     if (cmd.type == Order::Type::LIMIT && cmd.price <= Decimal(0,0)) return std::unexpected(TradingError::InvalidOrder);

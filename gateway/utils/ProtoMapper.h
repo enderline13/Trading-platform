@@ -99,7 +99,7 @@ namespace mapper {
         return common::Order::NEW;
     }
 
-    inline const Order::Status fromProto(const common::Order::OrderStatus status ) {
+    inline Order::Status fromProto(const common::Order::OrderStatus status ) {
         switch (status) {
             case common::Order::OrderStatus::Order_OrderStatus_NEW:  return Order::Status::NEW;
             case common::Order::OrderStatus::Order_OrderStatus_CANCELED:  return Order::Status::CANCELED;

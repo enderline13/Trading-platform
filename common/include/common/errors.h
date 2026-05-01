@@ -38,5 +38,7 @@ enum class TradingError {
     SystemStopped,
     MatchingFailed,
     OrderNotFound,
-    Unauthorized
+    Unauthorized,
+    InvalidLotSize,
+    InvalidTickSize
 };

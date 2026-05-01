@@ -15,6 +15,18 @@ struct Decimal {
         normalize();
     }
 
+    int64_t toNano() const {
+        return units * kNanoFactor + nanos;
+    }
+
+    static Decimal fromNano(int64_t value) {
+        Decimal d;
+        d.units = value / kNanoFactor;
+        d.nanos = value % kNanoFactor;
+        d.normalize();
+        return d;
+    }
+
     auto operator<=>(const Decimal&) const = default;
     static constexpr int32_t kNanoFactor = 1'000'000'000;
 
@@ -158,3 +170,16 @@ inline std::string decimalToSql(const Decimal& d) {
 
 inline std::string toSql(const Decimal& d) { return d.toString(); }
 inline Decimal fromSql(const std::string& s) { return decimalFromSql(s); }
+
+inline Decimal operator%(const Decimal& a, const Decimal& b) {
+    if (b.units == 0 && b.nanos == 0) {
+        throw std::runtime_error("Division by zero");
+    }
+
+    int64_t lhs = a.toNano();
+    int64_t rhs = b.toNano();
+
+    int64_t rem = lhs % rhs;
+
+    return Decimal::fromNano(rem);
+}
