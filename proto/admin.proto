@@ -18,9 +18,21 @@ message SystemStatus {
   string uptime = 5;
 }
 
+message AddPositionRequest {
+  uint64 user_id = 1;
+  uint64 instrument_id = 2;
+  common.Decimal quantity = 3;
+}
+
+message SystemStateRequest {
+  bool run_trading = 1; // true - RUNNING, false - STOPPED
+}
+
 service AdminService {
   rpc AddInstrument(common.Instrument) returns (google.protobuf.Empty);
   rpc UpdateInstrument(common.Instrument) returns (google.protobuf.Empty);
   rpc FundUserAccount(FundRequest) returns (google.protobuf.Empty); // Ручное начисление денег
   rpc GetSystemStatus(google.protobuf.Empty) returns (SystemStatus); // Нагрузка, кол-во активных ордеров
+  rpc SetSystemState(SystemStateRequest) returns (google.protobuf.Empty);
+  rpc AddPosition(AddPositionRequest) returns (google.protobuf.Empty);
 }

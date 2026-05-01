@@ -29,3 +29,7 @@ void AdminManager::setSystemState(bool running) {
     m_accounts->setSystemStatus(running);
     // Здесь можно добавить широковещательное уведомление через gRPC Stream в будущем
 }
+
+void AdminManager::AddPosition(const AddPositionRequest& request) const {
+    m_accounts->addPosition(request.user_id, request.instrument_id, request.quantity);
+}
