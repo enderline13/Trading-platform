@@ -32,6 +32,8 @@ message RecentTrades {
   repeated common.Trade trades = 1;
 }
 
+message InstrumentId { uint64 id = 1; }
+
 message CandlesRequest {
 
   uint64 instrument_id = 1;
@@ -52,18 +54,20 @@ service MarketService {
   rpc ListInstruments(google.protobuf.Empty)
       returns (InstrumentsList);
 
+  rpc GetInstrumentDetails(InstrumentId)
+      returns (common.Instrument);
+
   rpc GetOrderBook(InstrumentID)
       returns (OrderBook);
+  rpc GetRecentTrades(InstrumentID)
+      returns (RecentTrades);
+  rpc GetCandles(CandlesRequest)
+      returns (Candles);
 
   rpc StreamOrderBook(InstrumentID)
       returns (stream OrderBookUpdate);
-
-  rpc GetRecentTrades(InstrumentID)
-      returns (RecentTrades);
-
   rpc StreamTrades(InstrumentID)
       returns (stream common.Trade);
-
-  rpc GetCandles(CandlesRequest)
-      returns (Candles);
+  rpc StreamCandles(CandlesRequest)
+      returns (stream common.Candle);
 }
