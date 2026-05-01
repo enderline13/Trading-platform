@@ -59,7 +59,7 @@ AuthManager::login(const LoginCommand& cmd)
 }
 
 std::expected<User, AuthError>
-AuthManager::validateToken(const Token& token) const
+AuthManager::validateToken(const Token_view token) const
 {
     UserId uid;
     {
@@ -77,9 +77,12 @@ AuthManager::validateToken(const Token& token) const
     return user.value();
 }
 
-void AuthManager::logout(const Token& token) {
+void AuthManager::logout(const Token_view token) {
     std::unique_lock lock(m_sessionMutex);
-    m_sessions.erase(token);
+
+    if (const auto it = m_sessions.find(token); it != m_sessions.end()) {
+        m_sessions.erase(it);
+    }
 }
 
 std::expected<User, AuthError>

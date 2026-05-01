@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+import "google/protobuf/empty.proto";
+
 package auth;
 
 message RegisterRequest {
@@ -25,6 +27,12 @@ message User {
   uint64 id = 1;
   string username = 2;
   string email = 3;
+  Role role = 4;
+
+  enum Role {
+    USER = 0;
+    ADMIN = 1;
+  }
 }
 
 message GetUserRequest {
@@ -38,4 +46,6 @@ service AuthService {
   rpc AuthenticateUser(LoginRequest) returns (LoginResponse);
 
   rpc GetUserById(GetUserRequest) returns (User);
+
+  rpc GetCurrentUserId(google.protobuf.Empty) returns (User);
 }
