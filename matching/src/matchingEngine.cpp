@@ -43,9 +43,11 @@ std::expected<MatchResult, MatchingError> MatchingEngine::submitOrder(const std:
 
 std::expected<void, MatchingError>
 MatchingEngine::cancelOrder(const OrderId id) {
+    spdlog::info("Matching Engine: Beginning cancel of order {}", id);
     std::scoped_lock lock(m_mutex);
     const auto it = m_order_locations.find(id);
     if (it == m_order_locations.end()) {
+        spdlog::error("Order with id {} not found for cancel", id);
         return std::unexpected(MatchingError::OrderNotFound);
     }
 
@@ -68,12 +70,18 @@ MatchingEngine::getOrderBook(const InstrumentId id) const {
 }
 
 std::expected<std::shared_ptr<Order>, MatchingError> MatchingEngine::getOrder(const OrderId id) {
-    if (!m_order_locations.contains(id)) return std::unexpected(MatchingError::OrderNotFound);
+    if (!m_order_locations.contains(id)) {
+        spdlog::error("Order with id {} not found for getOrder", id);
+        return std::unexpected(MatchingError::OrderNotFound);
+    }
     return m_order_locations[id].book->getOrder(id);
 }
 
 std::optional<Decimal> MatchingEngine::getBestAsk(const uint64_t instrumentId) {
     std::scoped_lock lock(m_mutex);
-    if (!m_books.contains(instrumentId)) return std::nullopt;
+    if (!m_books.contains(instrumentId)) {
+        spdlog::error("Could not find instrument with id {}", instrumentId);
+        return std::nullopt;
+    }
     return m_books[instrumentId]->getBestAsk();
 }

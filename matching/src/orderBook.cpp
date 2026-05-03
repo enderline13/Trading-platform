@@ -102,7 +102,6 @@ OrderBook::processOrder(std::shared_ptr<Order> newOrder)
         }
     };
 
-    // 3. Вызов матчинга в зависимости от стороны
     if (newOrder->side == Order::Side::BUY) {
         perform_matching(m_asks, m_bids);
     } else {
@@ -118,7 +117,7 @@ OrderBook::processOrder(std::shared_ptr<Order> newOrder)
     return result;
 }
 
-void OrderBook::process_stop_orders(Decimal lastPrice, MatchResult& result) {
+void OrderBook::process_stop_orders(const Decimal lastPrice, MatchResult& result) {
     if (m_stop_orders.empty()) return;
 
     std::vector<std::shared_ptr<Order>> triggered;
@@ -131,7 +130,7 @@ void OrderBook::process_stop_orders(Decimal lastPrice, MatchResult& result) {
         if (trigger) {
             spdlog::info("OrderBook: STOP Order {} triggered at price {}", o->id, lastPrice.toString());
             triggered.push_back(o);
-            m_orders.erase(o->id); // Удаляем из индекса ожидания
+            m_orders.erase(o->id);
             it = m_stop_orders.erase(it);
         } else {
             ++it;
@@ -159,11 +158,14 @@ std::expected<void, MatchingError>
 OrderBook::cancelOrder(OrderId id)
 {
     auto it = m_orders.find(id);
-    if (it == m_orders.end()) return std::unexpected(MatchingError::OrderNotFound);
-
-    if (it->second->status == Order::Status::FILLED)
+    if (it == m_orders.end()) {
+        spdlog::error("OrderBook: Order with id {} not found for cancel", id);
+        return std::unexpected(MatchingError::OrderNotFound);
+    }
+    if (it->second->status == Order::Status::FILLED) {
+        spdlog::error("OrderBook: cannot cancel order because it's already filled", id);
         return std::unexpected(MatchingError::AlreadyFilled);
-
+    }
     it->second->status = Order::Status::CANCELED;
     it->second->remaining_quantity = Decimal{0,0};
 

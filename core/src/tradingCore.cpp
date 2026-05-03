@@ -27,7 +27,6 @@ TradingCore::placeOrder(const PlaceOrderCommand& cmd) const
             lockPrice = (*bestAsk) * Decimal{1, 100000000}; // +10%
         }
         else if (cmd.type == Order::Type::STOP) {
-            // Для STOP BUY блокируем (ЦенаАктивации + 10%), т.к. он станет MARKET
             lockPrice = cmd.price * Decimal{1, 100000000};
             spdlog::info("STOP BUY: Locking with protection: {}", lockPrice.toString());
         }
@@ -65,7 +64,6 @@ TradingCore::placeOrder(const PlaceOrderCommand& cmd) const
             return std::unexpected(TradingError::InsufficientBalance);
         }
     } else {
-        // Для SELL (даже STOP) просто блокируем имеющиеся активы
         if (!m_accounts->lockAsset(cmd.user_id, cmd.instrument_id, cmd.quantity)) {
             return std::unexpected(TradingError::InsufficientPosition);
         }
@@ -117,8 +115,6 @@ TradingCore::placeOrder(const PlaceOrderCommand& cmd) const
     }
 
     if (cmd.side == Order::Side::BUY && cmd.type != Order::Type::STOP) {
-        // Рефанд делаем только если ордер НЕ остался ждать в стакане (MARKET или исполненный LIMIT)
-        // Для STOP ордеров рефанд произойдет только в момент их реального срабатывания в будущем
         Decimal totalLocked = lockPrice * cmd.quantity;
         if (order.status == Order::Status::FILLED && totalLocked > totalSpent) {
             m_accounts->unlockBalance(cmd.user_id, totalLocked - totalSpent);
@@ -178,7 +174,7 @@ TradingCore::cancelOrder(const CancelOrderCommand& cmd) const
     if (order.side == Order::Side::BUY) {
         Decimal refundPrice = order.price;
         if (order.type == Order::Type::STOP) {
-             refundPrice = order.price * Decimal{1, 100000000}; // Те же +10%
+             refundPrice = order.price * Decimal{1, 100000000};
         }
 
         const Decimal amountToRefund = refundPrice * order.remaining_quantity;
@@ -203,6 +199,8 @@ TradingCore::cancelOrder(const CancelOrderCommand& cmd) const
 std::expected<std::vector<Order>, TradingError>
 TradingCore::getUserOrders(const GetOrdersQuery& query) const
 {
+    spdlog::info("Getting user orders by status: {} and instrument: {}", query.status.has_value(), query.instrument_id.has_value());
+
     auto orders = m_orders->getByUser(query.user_id);
 
     std::vector<Order> result;
@@ -224,5 +222,6 @@ TradingCore::getUserOrders(const GetOrdersQuery& query) const
 std::expected<std::vector<Trade>, TradingError>
 TradingCore::getTradeHistory(const GetTradesQuery& query) const
 {
+    spdlog::info("Getting trade history by instrument: {}", query.instrument_id.has_value());
     return m_trades->getByUser(query.user_id, query.instrument_id);
 }

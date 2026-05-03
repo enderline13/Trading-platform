@@ -3,6 +3,8 @@
 #include <random>
 #include <mutex>
 
+#include <spdlog/spdlog.h>
+
 #include "common/errors.h"
 
 std::string generateRandomToken() {
@@ -27,11 +29,16 @@ std::string hashPassword(const std::string& password) {
 std::expected<UserId, AuthError>
 AuthManager::registerUser(const RegisterCommand& cmd) const
 {
-    if (cmd.username.empty() || cmd.password.empty() || cmd.email.empty())
-        return std::unexpected(AuthError::InvalidInput);
-    if (m_users->getByEmail(cmd.email))
-        return std::unexpected(AuthError::UserAlreadyExists);
+    spdlog::info("Registering user {}", cmd.username);
 
+    if (cmd.username.empty() || cmd.password.empty() || cmd.email.empty()) {
+        spdlog::error("Bad register info for user '{}'", cmd.username);
+        return std::unexpected(AuthError::InvalidInput);
+    }
+    if (m_users->getByEmail(cmd.email)) {
+        spdlog::error("Email already exists for user '{}'", cmd.username);
+        return std::unexpected(AuthError::UserAlreadyExists);
+    }
     User user;
     user.username = cmd.username;
     user.email = cmd.email;
@@ -43,7 +50,9 @@ AuthManager::registerUser(const RegisterCommand& cmd) const
 std::expected<Token, AuthError>
 AuthManager::login(const LoginCommand& cmd)
 {
-    auto userOpt = m_users->getByUsername(cmd.username);
+    spdlog::info("Logging in user {}", cmd.username);
+
+    const auto userOpt = m_users->getByUsername(cmd.username);
     if (!userOpt) return std::unexpected(AuthError::UserNotFound);
 
     if (userOpt->password_hash != hashPassword(cmd.password))
