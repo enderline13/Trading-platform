@@ -109,7 +109,8 @@ public:
                 decimalFromSql(res->getString("price")),
                 decimalFromSql(res->getString("quantity")),
                 decimalFromSql(res->getString("remaining_quantity")),
-                stringToOrderStatus(res->getString("status"))
+                stringToOrderStatus(res->getString("status").asStdString()),
+                   timeFromSqlString(res->getString("created_at"))
             });
         }
 

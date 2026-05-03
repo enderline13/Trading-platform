@@ -40,6 +40,7 @@ public:
     std::expected<MatchResult, MatchingError> processOrder(std::shared_ptr<Order> newOrder);
     std::expected<void, MatchingError> cancelOrder(OrderId id);
     std::shared_ptr<Order> getOrder(OrderId id);
+    std::optional<Decimal> getBestAsk() const;
 
 private:
     using BidQueue = std::priority_queue<std::shared_ptr<Order>, std::vector<std::shared_ptr<Order>>, BidComp>;

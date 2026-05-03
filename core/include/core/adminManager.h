@@ -20,11 +20,11 @@ public:
                  std::shared_ptr<IAccountRepository> accounts) 
         : m_conn(std::move(conn)), m_instruments(std::move(instruments)), m_accounts(std::move(accounts)) {}
 
-    void addInstrument(const Instrument& i);
-    void updateInstrument(const Instrument& i);
-    void fundUser(UserId id, Decimal amount);
+    void addInstrument(const Instrument& i) const;
+    void updateInstrument(const Instrument& i) const;
+    void fundUser(UserId id, Decimal amount) const;
     admin::SystemStatus getSystemStatus() const;
-    void setSystemState(bool running);
+    void setSystemState(bool running) const;
     void AddPosition(const AddPositionRequest& request) const;
 private:
     std::shared_ptr<sql::Connection> m_conn;

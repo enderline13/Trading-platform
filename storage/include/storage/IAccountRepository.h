@@ -15,22 +15,6 @@ struct BalanceHistoryEntry {
     std::chrono::system_clock::time_point timestamp;
 };
 
-inline std::chrono::system_clock::time_point timeFromSqlString(const std::string& sqlTime) {
-    if (sqlTime.empty()) return {};
-
-    std::tm tm = {};
-    std::istringstream ss(sqlTime);
-
-    ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
-
-    if (ss.fail()) {
-        return std::chrono::system_clock::now(); // or throw exception
-    }
-
-    time_t tt = std::mktime(&tm);
-    return std::chrono::system_clock::from_time_t(tt);
-}
-
 class IAccountRepository {
 public:
     virtual ~IAccountRepository() = default;
@@ -47,15 +31,117 @@ public:
     virtual std::vector<BalanceHistoryEntry> getHistory(uint64_t accountId) = 0;
     virtual void setSystemStatus(bool running) = 0;
     virtual bool isSystemRunning() = 0;
+
+    virtual bool lockBalance(UserId userId, Decimal amount) = 0;
+    virtual void unlockBalance(UserId userId, Decimal amount) = 0;
+
+    virtual bool lockAsset(UserId userId, InstrumentId instId, Decimal qty) = 0;
+    virtual void unlockAsset(UserId userId, InstrumentId instId, Decimal qty) = 0;
+
+    virtual void settleTrade(UserId buyerId, UserId sellerId, InstrumentId instId, Decimal qty, Decimal price, TradeId tradeId) = 0;
 };
 
 class MySqlAccountRepository final : public IAccountRepository {
 private:
     std::shared_ptr<sql::Connection> m_conn;
 
+    void updateBalanceReserved(const UserId userId, const Decimal delta) const {
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
+            "UPDATE accounts SET balance_reserved = balance_reserved + ? WHERE user_id = ?"
+        ));
+
+        pstmt->setString(1, delta.toString());
+        pstmt->setUInt64(2, userId);
+
+        pstmt->executeUpdate();
+    }
+
+    void updateAssetReserved(const UserId userId, const InstrumentId instId, const Decimal delta) const {
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
+            "UPDATE positions SET quantity_reserved = quantity_reserved + ? "
+            "WHERE instrument_id = ? AND account_id = (SELECT id FROM accounts WHERE user_id = ?)"
+        ));
+        pstmt->setString(1, delta.toString());
+        pstmt->setUInt64(2, instId);
+        pstmt->setUInt64(3, userId);
+        pstmt->executeUpdate();
+    }
+
 public:
     explicit MySqlAccountRepository(std::shared_ptr<sql::Connection> conn)
        : m_conn(std::move(conn)) {}
+
+    bool lockBalance(const UserId userId, const Decimal amount) override {
+    PrepStatementPtr pstmt(m_conn->prepareStatement(
+        "UPDATE accounts SET balance_cash = balance_cash - ?, balance_reserved = balance_reserved + ? "
+        "WHERE user_id = ? AND balance_cash >= ?"
+    ));
+    const std::string amtStr = amount.toString();
+    pstmt->setString(1, amtStr);
+    pstmt->setString(2, amtStr);
+    pstmt->setUInt64(3, userId);
+    pstmt->setString(4, amtStr);
+
+    return pstmt->executeUpdate() > 0;
+}
+
+    void unlockBalance(const UserId userId, const Decimal amount) override {
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
+            "UPDATE accounts SET balance_cash = balance_cash + ?, balance_reserved = balance_reserved - ? "
+            "WHERE user_id = ?"
+        ));
+        const std::string amtStr = amount.toString();
+        pstmt->setString(1, amtStr);
+        pstmt->setString(2, amtStr);
+        pstmt->setUInt64(3, userId);
+        pstmt->executeUpdate();
+    }
+
+    bool lockAsset(const UserId userId, const InstrumentId instId, const Decimal qty) override {
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
+            "UPDATE positions SET quantity = quantity - ?, quantity_reserved = quantity_reserved + ? "
+            "WHERE instrument_id = ? AND account_id = (SELECT id FROM accounts WHERE user_id = ?) AND quantity >= ?"
+        ));
+        const std::string qtyStr = qty.toString();
+        pstmt->setString(1, qtyStr);
+        pstmt->setString(2, qtyStr);
+        pstmt->setUInt64(3, instId);
+        pstmt->setUInt64(4, userId);
+        pstmt->setString(5, qtyStr);
+
+        return pstmt->executeUpdate() > 0;
+    }
+
+    void unlockAsset(const UserId userId, const InstrumentId instId, const Decimal qty) override {
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
+            "UPDATE positions SET quantity = quantity + ?, quantity_reserved = quantity_reserved - ? "
+            "WHERE instrument_id = ? AND account_id = (SELECT id FROM accounts WHERE user_id = ?)"
+        ));
+
+        const std::string qtyStr = qty.toString();
+        pstmt->setString(1, qtyStr);
+        pstmt->setString(2, qtyStr);
+        pstmt->setUInt64(3, instId);
+        pstmt->setUInt64(4, userId);
+
+        pstmt->executeUpdate();
+    }
+
+    void settleTrade(const UserId buyerId, const UserId sellerId, const InstrumentId instId, const Decimal qty, const Decimal price, TradeId tradeId) override {
+        const Decimal totalCost = price * qty;
+
+        updateBalanceReserved(buyerId, -totalCost);
+        updatePosition(buyerId, instId, qty, price);
+
+        const AccountId buyerAccId = getAccountIdByUserId(buyerId);
+        addHistoryEntry(buyerAccId, -totalCost, "TRADE_BUY", tradeId);
+
+        updateAssetReserved(sellerId, instId, -qty);
+        changeBalance(sellerId, totalCost);
+
+        const AccountId sellerAccId = getAccountIdByUserId(sellerId);
+        addHistoryEntry(sellerAccId, totalCost, "TRADE_SELL", tradeId);
+    }
 
     // BALANCE
 
@@ -93,11 +179,13 @@ public:
     // POSITIONS
 
     void addPosition(const uint64_t userId, const uint64_t instId, const Decimal qty) override {
+        auto account_id = getAccountIdByUserId(userId);
+
         PrepStatementPtr pstmt(m_conn->prepareStatement(
-            "INSERT INTO positions (user_id, instrument_id, quantity) VALUES (?, ?, ?) "
+            "INSERT INTO positions (account_id, instrument_id, quantity) VALUES (?, ?, ?) "
             "ON DUPLICATE KEY UPDATE quantity = quantity + ?"
         ));
-        pstmt->setUInt64(1, userId);
+        pstmt->setUInt64(1, account_id);
         pstmt->setUInt64(2, instId);
         pstmt->setString(3, qty.toString());
         pstmt->setString(4, qty.toString());

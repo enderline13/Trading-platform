@@ -1,8 +1,8 @@
 #include "core/adminManager.h"
 
-void AdminManager::addInstrument(const Instrument& i) { m_instruments->add(i); }
+void AdminManager::addInstrument(const Instrument& i) const { m_instruments->add(i); }
 
-void AdminManager::fundUser(const UserId id, const Decimal amount) {
+void AdminManager::fundUser(const UserId id, const Decimal amount) const {
     const auto accId = m_accounts->getAccountIdByUserId(id);
     m_accounts->updateBalance(accId, amount);
 }
@@ -17,15 +17,16 @@ admin::SystemStatus AdminManager::getSystemStatus() const {
     };
     status.set_total_users_count(countQuery("users"));
     status.set_active_orders_count(countQuery("orders"));
+    status.set_is_running(m_accounts->isSystemRunning());
 
     return status;
 }
 
-void AdminManager::updateInstrument(const Instrument& i) {
+void AdminManager::updateInstrument(const Instrument& i) const {
     m_instruments->update(i);
 }
 
-void AdminManager::setSystemState(bool running) {
+void AdminManager::setSystemState(bool running) const {
     m_accounts->setSystemStatus(running);
     // Здесь можно добавить широковещательное уведомление через gRPC Stream в будущем
 }

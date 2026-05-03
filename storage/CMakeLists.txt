@@ -14,10 +14,11 @@ set(HEADERS
 )
 
 find_package(mysql-concpp REQUIRED)
+find_package(spdlog REQUIRED)
 
 add_library(${PROJECT_NAME} INTERFACE)
 
-target_link_libraries(${PROJECT_NAME} INTERFACE mysql::concpp-jdbc)
+target_link_libraries(${PROJECT_NAME} INTERFACE mysql::concpp-jdbc spdlog::spdlog)
 
 target_include_directories(${PROJECT_NAME} INTERFACE include/)
 

@@ -1,41 +1,74 @@
 #include "core/tradingCore.h"
 
+#include <spdlog/spdlog.h>
+
 #include "core/TransactionGuard.h"
 
 std::expected<PlaceOrderResult, TradingError>
 TradingCore::placeOrder(const PlaceOrderCommand& cmd) const
 {
+    spdlog::info("Placing order: UserID={}, InstID={}, Side={}, Qty={}",
+                 cmd.user_id, cmd.instrument_id, static_cast<int>(cmd.side), cmd.quantity.toString());
+
     TransactionGuard tx(m_conn);
 
     auto instruments = m_instruments->getById(cmd.instrument_id);
-    if (!instruments) return std::unexpected(TradingError::InstrumentNotFound);
+    if (!instruments) {
+        spdlog::error("Instrument {} not found", cmd.instrument_id);
+        return std::unexpected(TradingError::InstrumentNotFound);
+    }
     const auto& config = instruments.value();
 
+    Decimal lockPrice = cmd.price;
+    if (cmd.side == Order::Side::BUY) {
+        if (cmd.type == Order::Type::MARKET) {
+            auto bestAsk = m_matching->getBestAsk(cmd.instrument_id);
+            if (!bestAsk) return std::unexpected(TradingError::NoLiquidity);
+            lockPrice = (*bestAsk) * Decimal{1, 100000000}; // +10%
+        }
+        else if (cmd.type == Order::Type::STOP) {
+            // Для STOP BUY блокируем (ЦенаАктивации + 10%), т.к. он станет MARKET
+            lockPrice = cmd.price * Decimal{1, 100000000};
+            spdlog::info("STOP BUY: Locking with protection: {}", lockPrice.toString());
+        }
+    }
+
     if (cmd.quantity <= Decimal(0,0) || (cmd.quantity % config.lot_size) != Decimal(0,0)) {
+        spdlog::warn("Invalid lot size for User {}: Qty={}", cmd.user_id, cmd.quantity.toString());
         return std::unexpected(TradingError::InvalidLotSize);
     }
 
-    if (cmd.type == Order::Type::LIMIT) {
+    if (cmd.type == Order::Type::LIMIT || cmd.type == Order::Type::STOP) {
         if (cmd.price <= Decimal(0,0) || (cmd.price % config.tick_size) != Decimal(0,0)) {
             return std::unexpected(TradingError::InvalidTickSize);
         }
     }
 
-    if (!m_accounts->isSystemRunning()) return std::unexpected(TradingError::SystemStopped);
-    if (cmd.quantity <= Decimal(0,0)) return std::unexpected(TradingError::InvalidOrder);
-    if (cmd.type == Order::Type::LIMIT && cmd.price <= Decimal(0,0)) return std::unexpected(TradingError::InvalidOrder);
-
-    if (cmd.side == Order::Side::BUY) {
-        auto userBalance = m_accounts->getBalance(cmd.user_id);
-        if (!userBalance) return std::unexpected(TradingError::UserNotFound);
-        if (Decimal required = cmd.price * cmd.quantity; userBalance.value() < required)
-            return std::unexpected(TradingError::InsufficientBalance);
+    if (!m_accounts->isSystemRunning()) {
+        spdlog::error("System not running");
+        return std::unexpected(TradingError::SystemStopped);
     }
 
-    if (cmd.side == Order::Side::SELL) {
-        auto position = m_accounts->getPosition(cmd.user_id, cmd.instrument_id);
-        if (!position) return std::unexpected(TradingError::InsufficientPosition);
-        if (position.value().quantity < cmd.quantity) return std::unexpected(TradingError::InsufficientPosition);
+    if (cmd.quantity <= Decimal(0,0)) {
+        spdlog::error("Order quantity < 0");
+        return std::unexpected(TradingError::InvalidOrder);
+    }
+    if (cmd.type == Order::Type::LIMIT && cmd.price <= Decimal(0,0)) {
+        spdlog::error("Price for limit order < 0");
+        return std::unexpected(TradingError::InvalidOrder);
+    }
+
+    if (cmd.side == Order::Side::BUY) {
+        Decimal required = lockPrice * cmd.quantity;
+        if (!m_accounts->lockBalance(cmd.user_id, required)) {
+            spdlog::warn("Insufficient balance. Required: {}", required.toString());
+            return std::unexpected(TradingError::InsufficientBalance);
+        }
+    } else {
+        // Для SELL (даже STOP) просто блокируем имеющиеся активы
+        if (!m_accounts->lockAsset(cmd.user_id, cmd.instrument_id, cmd.quantity)) {
+            return std::unexpected(TradingError::InsufficientPosition);
+        }
     }
 
     Order order;
@@ -54,10 +87,14 @@ TradingCore::placeOrder(const PlaceOrderCommand& cmd) const
 
     auto orderPtr = std::make_shared<Order>(order);
     auto result = m_matching->submitOrder(orderPtr);
-    if (!result)
+    if (!result) {
+        spdlog::error("Matching failed");
         return std::unexpected(TradingError::MatchingFailed);
+    }
 
     order = *orderPtr;
+
+    Decimal totalSpent{0,0};
 
     for (const auto& trade : result->trades) {
         auto buyOrder = m_orders->get(trade.buy_order_id);
@@ -65,21 +102,27 @@ TradingCore::placeOrder(const PlaceOrderCommand& cmd) const
 
         if (buyOrder && sellOrder) {
             TradeId tradeId = m_trades->save(trade, buyOrder->user_id, sellOrder->user_id);
-            Decimal totalCost = trade.price * trade.quantity;
 
-            AccountId buyerAccId = m_accounts->getAccountIdByUserId(buyOrder->user_id);
-            m_accounts->changeBalance(buyOrder->user_id, -totalCost);
-            m_accounts->addHistoryEntry(buyerAccId, -totalCost, "TRADE", tradeId);
-            m_accounts->updatePosition(buyOrder->user_id, trade.instrument_id,
-                                       trade.quantity, trade.price);
+            if (buyOrder->user_id == cmd.user_id) {
+                totalSpent += (trade.price * trade.quantity);
+            }
 
-            AccountId sellerAccId = m_accounts->getAccountIdByUserId(sellOrder->user_id);
-            m_accounts->changeBalance(sellOrder->user_id, totalCost);
-            m_accounts->addHistoryEntry(sellerAccId, totalCost, "TRADE", tradeId);
-            m_accounts->updatePosition(sellOrder->user_id, trade.instrument_id,
-                                       -trade.quantity, trade.price);
+            m_accounts->settleTrade(buyOrder->user_id, sellOrder->user_id,
+                                   trade.instrument_id, trade.quantity, trade.price, tradeId);
         }
-        else return std::unexpected(TradingError::MatchingFailed);
+        else {
+            spdlog::error("There is no both buyer and seller order in the trade");
+            return std::unexpected(TradingError::MatchingFailed);
+        }
+    }
+
+    if (cmd.side == Order::Side::BUY && cmd.type != Order::Type::STOP) {
+        // Рефанд делаем только если ордер НЕ остался ждать в стакане (MARKET или исполненный LIMIT)
+        // Для STOP ордеров рефанд произойдет только в момент их реального срабатывания в будущем
+        Decimal totalLocked = lockPrice * cmd.quantity;
+        if (order.status == Order::Status::FILLED && totalLocked > totalSpent) {
+            m_accounts->unlockBalance(cmd.user_id, totalLocked - totalSpent);
+        }
     }
 
     for (const auto& filledId : result->filled_order_ids) {
@@ -114,20 +157,46 @@ std::expected<Order, TradingError> TradingCore::getOrder(const OrderId orderId) 
 std::expected<void, TradingError>
 TradingCore::cancelOrder(const CancelOrderCommand& cmd) const
 {
-    auto orderOpt = m_orders->get(cmd.order_id);
-    if (!orderOpt)
-        return std::unexpected(TradingError::OrderNotFound);
+    TransactionGuard tx(m_conn);
+
+    const auto orderOpt = m_orders->get(cmd.order_id);
+    if (!orderOpt) return std::unexpected(TradingError::OrderNotFound);
+
     const auto& order = orderOpt.value();
-    if (order.user_id != cmd.user_id)
-        return std::unexpected(TradingError::Unauthorized);
+    if (order.user_id != cmd.user_id) return std::unexpected(TradingError::Unauthorized);
+
+    if (order.status == Order::Status::FILLED || order.status == Order::Status::CANCELED) {
+        return std::unexpected(TradingError::InvalidOrder);
+    }
 
     auto res = m_matching->cancelOrder(cmd.order_id);
-    if (!res) return std::unexpected(TradingError::MatchingFailed);
+    if (!res) {
+        spdlog::error("Cancel failed in MatchingEngine for OrderID={}", cmd.order_id);
+        return std::unexpected(TradingError::MatchingFailed);
+    }
+
+    if (order.side == Order::Side::BUY) {
+        Decimal refundPrice = order.price;
+        if (order.type == Order::Type::STOP) {
+             refundPrice = order.price * Decimal{1, 100000000}; // Те же +10%
+        }
+
+        const Decimal amountToRefund = refundPrice * order.remaining_quantity;
+        m_accounts->unlockBalance(order.user_id, amountToRefund);
+        spdlog::info("Refunded {} USDT to User {} (Cancel Order {})",
+                     amountToRefund.toString(), order.user_id, order.id);
+    } else {
+        m_accounts->unlockAsset(order.user_id, order.instrument_id, order.remaining_quantity);
+        spdlog::info("Refunded {} units of Inst {} to User {} (Cancel Order {})",
+                     order.remaining_quantity.toString(), order.instrument_id, order.user_id, order.id);
+    }
 
     Order updated = order;
     updated.status = Order::Status::CANCELED;
+    updated.remaining_quantity = Decimal{0,0};
     m_orders->update(updated);
 
+    tx.commit();
     return {};
 }
 

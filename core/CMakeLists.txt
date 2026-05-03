@@ -4,6 +4,7 @@ project(Core)
 set(CMAKE_CXX_STANDARD 23)
 
 find_package(nlohmann_json REQUIRED)
+find_package(spdlog REQUIRED)
 
 set(HEADERS
         include/core/tradingCore.h
@@ -25,6 +26,6 @@ add_library(${PROJECT_NAME} STATIC ${SOURCES} ${HEADERS})
 
 target_include_directories(${PROJECT_NAME} PUBLIC include/)
 
-target_link_libraries(${PROJECT_NAME} PUBLIC common Market_data Matching Storage proto_generated)
+target_link_libraries(${PROJECT_NAME} PUBLIC common Market_data Matching Storage proto_generated spdlog::spdlog)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC nlohmann_json::nlohmann_json)

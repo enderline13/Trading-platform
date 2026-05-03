@@ -19,6 +19,7 @@ public:
 
     std::expected<std::shared_ptr<const OrderBook>, MatchingError> getOrderBook(InstrumentId id) const;
     std::expected<std::shared_ptr<Order>, MatchingError> getOrder(OrderId id);
+    std::optional<Decimal> getBestAsk(uint64_t instrumentId);
 
 private:
     std::unordered_map<OrderId, OrderLocation> m_order_locations;

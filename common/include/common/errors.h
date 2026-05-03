@@ -40,5 +40,6 @@ enum class TradingError {
     OrderNotFound,
     Unauthorized,
     InvalidLotSize,
-    InvalidTickSize
+    InvalidTickSize,
+    NoLiquidity
 };

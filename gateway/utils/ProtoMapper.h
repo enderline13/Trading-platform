@@ -158,11 +158,11 @@ namespace mapper {
         po.set_instrument_id(o.instrument_id);
         po.set_side(toProto(o.side));
         po.set_type(toProto(o.type));
+        po.set_status(toProto(o.status));
         *po.mutable_price() = toProto(o.price);
         *po.mutable_quantity() = toProto(o.quantity);
         *po.mutable_remaining_quantity() = toProto(o.remaining_quantity);
 
-        // Преобразование времени
         *po.mutable_created_at() = toProtoTimestamp(o.created_at);
         return po;
     }
