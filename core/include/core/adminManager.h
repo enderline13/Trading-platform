@@ -5,13 +5,7 @@
 #include "admin.pb.h"
 #include "storage/IInstrumentRepository.h"
 #include "storage/IAccountRepository.h"
-
-struct AddPositionRequest {
-    uint64_t user_id = 0;
-    uint64_t instrument_id = 0;
-
-    Decimal quantity;
-};
+#include "common/ProtoMapper.h"
 
 class AdminManager final {
 public:

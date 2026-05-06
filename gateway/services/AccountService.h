@@ -2,7 +2,7 @@
 
 #include "account.grpc.pb.h"
 #include "core/core.h"
-#include "../utils/ProtoMapper.h"
+#include "common/ProtoMapper.h"
 #include "../utils/Authenticate.h"
 
 class AccountServiceImpl final : public account::AccountService::Service {

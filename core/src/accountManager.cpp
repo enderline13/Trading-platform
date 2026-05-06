@@ -41,7 +41,7 @@ AccountManager::deposit(const DepositCommand& cmd) const {
 
 std::expected<void, BalanceError>
 AccountManager::withdraw(const WithdrawCommand& cmd) const {
-    spdlog::info("Depositing {} money from user {}", cmd.amount.toString(), cmd.user_id);
+    spdlog::info("Withdrawing {} money from user {}", cmd.amount.toString(), cmd.user_id);
     TransactionGuard tx(m_conn);
     if (cmd.amount <= Decimal{0, 0}) {
         spdlog::error("Trying to withdraw < 0");
@@ -58,12 +58,10 @@ AccountManager::withdraw(const WithdrawCommand& cmd) const {
         spdlog::error("Not enough money to withdraw");
         return std::unexpected(BalanceError::InsufficientMoney);
     }
-    Decimal delta = cmd.amount;
-    delta.units = -delta.units;
-    delta.nanos = -delta.nanos;
+    const Decimal delta = -cmd.amount;
 
     m_accounts->changeBalance(cmd.user_id, delta);
-    m_accounts->addHistoryEntry(accId, cmd.amount, "WITHDRAWAL", std::nullopt);
+    m_accounts->addHistoryEntry(accId, delta, "WITHDRAWAL", std::nullopt);
     tx.commit();
     return {};
 }

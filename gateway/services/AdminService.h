@@ -1,7 +1,8 @@
+#pragma once
+
 #include "admin.grpc.pb.h"
 #include "core/core.h"
-#include "../utils/Authenticate.h"
-#include "../utils/ProtoMapper.h"
+#include "common/ProtoMapper.h"
 
 class AdminServiceImpl final : public admin::AdminService::Service {
 private:
@@ -146,6 +147,4 @@ public:
             return {grpc::StatusCode::INTERNAL, "Unknown internal error"};
         }
     }
-
-
 };

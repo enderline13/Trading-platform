@@ -4,15 +4,12 @@ project(Market_data)
 set(CMAKE_CXX_STANDARD 23)
 
 set(HEADERS
-        include/market_data/marketData.h
+        include/market_data/CandleAggregator.h
+        include/market_data/InstrumentData.h
 )
 
-set(SOURCES
-        src/marketData.cpp
-)
+add_library(${PROJECT_NAME} INTERFACE)
 
-add_library(${PROJECT_NAME} STATIC ${SOURCES} ${HEADERS})
+target_include_directories(${PROJECT_NAME} INTERFACE include/)
 
-target_include_directories(${PROJECT_NAME} PUBLIC include/)
-
-target_link_libraries(${PROJECT_NAME} common)
+target_link_libraries(${PROJECT_NAME} INTERFACE common)

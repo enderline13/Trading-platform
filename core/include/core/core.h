@@ -4,11 +4,12 @@
 #include "authManager.h"
 #include "tradingCore.h"
 #include "adminManager.h"
+#include "MarketDataManager.h"
 #include "storage/IAccountRepository.h"
 #include "storage/IUserRepository.h"
 #include "storage/ITradeRepository.h"
 #include "storage/IOrderRepository.h"
-#include "matching/matchingEngine.h"
+#include "matching/MatchingEngine.h"
 
 class Core {
 public:
@@ -19,11 +20,12 @@ public:
             std::shared_ptr<ITradeRepository> trades,
             std::shared_ptr<IAccountRepository> accounts,
             std::shared_ptr<IInstrumentRepository> instruments,
-            std::shared_ptr<MatchingEngine> matching
+            std::shared_ptr<MatchingEngine> matching,
+            std::shared_ptr<MarketDataManager> marketData
         )
             : m_conn(conn), auth(conn, users),
-              trading(conn, orders, trades, accounts, instruments, matching),
-              account(conn, accounts), admin(conn, instruments, accounts) {}
+              trading(conn, orders, trades, accounts, instruments, matching, marketData),
+              account(conn, accounts), admin(conn, instruments, accounts), m_marketData(marketData) {}
 
     std::expected<UserId, AuthError> registerUser(const RegisterCommand& cmd) const {
         return auth.registerUser(cmd);
@@ -110,6 +112,12 @@ public:
         admin.AddPosition(request);
     }
 
+    MarketDataManager& getMarketData() const { return *m_marketData; }
+
+    std::optional<Decimal> getBestAsk(const InstrumentId id) const {
+        return trading.getBestAsk(id);
+    }
+
 private:
     std::shared_ptr<sql::Connection> m_conn;
 
@@ -117,4 +125,6 @@ private:
     TradingCore trading;
     AccountManager account;
     AdminManager admin;
+
+    std::shared_ptr<MarketDataManager> m_marketData = std::make_unique<MarketDataManager>();;
 };

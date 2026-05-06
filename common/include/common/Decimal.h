@@ -1,10 +1,9 @@
 #pragma once
 
 #include <cstdint>
-#include <compare>
 #include <cmath>
 #include <string>
-#include <format>
+#include <stdexcept>
 
 struct Decimal {
     int64_t units = 0;

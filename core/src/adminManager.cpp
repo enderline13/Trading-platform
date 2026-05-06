@@ -3,8 +3,7 @@
 void AdminManager::addInstrument(const Instrument& i) const { m_instruments->add(i); }
 
 void AdminManager::fundUser(const UserId id, const Decimal amount) const {
-    const auto accId = m_accounts->getAccountIdByUserId(id);
-    m_accounts->updateBalance(accId, amount);
+    m_accounts->updateBalance(id, amount);
 }
 
 admin::SystemStatus AdminManager::getSystemStatus() const {

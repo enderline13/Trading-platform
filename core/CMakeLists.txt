@@ -13,6 +13,7 @@ set(HEADERS
         include/core/core.h
         include/core/TransactionGuard.h
         include/core/adminManager.h
+        include/core/MarketDataManager.h
 )
 
 set(SOURCES
@@ -20,6 +21,8 @@ set(SOURCES
         src/accountManager.cpp
         src/authManager.cpp
         src/adminManager.cpp
+        src/MarketDataManager.cpp
+        src/TradingSimulator.cpp
 )
 
 add_library(${PROJECT_NAME} STATIC ${SOURCES} ${HEADERS})

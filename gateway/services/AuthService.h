@@ -1,6 +1,8 @@
+#pragma once
+
 #include "auth.grpc.pb.h"
 #include "core/core.h"
-#include "../utils/ProtoMapper.h"
+#include "common/ProtoMapper.h"
 #include "../utils/Authenticate.h"
 
 class AuthServiceImpl final : public auth::AuthService::Service {

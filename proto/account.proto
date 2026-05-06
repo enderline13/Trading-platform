@@ -29,7 +29,6 @@ message WithdrawRequest {
 }
 
 service AccountService {
-
   rpc GetBalance(google.protobuf.Empty)
       returns (common.Decimal);
 

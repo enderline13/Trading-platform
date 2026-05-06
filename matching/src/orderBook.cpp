@@ -51,6 +51,7 @@ OrderBook::processOrder(std::shared_ptr<Order> newOrder)
             trade.instrument_id = newOrder->instrument_id;
             trade.buy_order_id = (newOrder->side == Order::Side::BUY) ? newOrder->id : top->id;
             trade.sell_order_id = (newOrder->side == Order::Side::SELL) ? newOrder->id : top->id;
+            trade.executed_at = std::chrono::system_clock::now();
 
             result.trades.push_back(trade);
 
@@ -170,7 +171,10 @@ OrderBook::cancelOrder(OrderId id)
     it->second->remaining_quantity = Decimal{0,0};
 
     m_orders.erase(it);
-    spdlog::debug("OrderBook: Order {} marked as CANCELED", id);
+    clean_top(m_bids);
+    clean_top(m_asks);
+
+    spdlog::info("OrderBook: Order {} marked as CANCELED", id);
 
     return {};
 }

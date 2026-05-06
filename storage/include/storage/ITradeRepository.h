@@ -63,7 +63,8 @@ public:
                 res->getUInt64("buy_order_id"),
                 res->getUInt64("sell_order_id"),
                 decimalFromSql(res->getString("price")),
-                decimalFromSql(res->getString("quantity"))
+                decimalFromSql(res->getString("quantity")),
+                timeFromSqlString(res->getString("executed_at"))
             });
         }
         return result;

@@ -37,14 +37,18 @@ struct OrderLocation {
 
 class OrderBook {
 public:
+    using BidQueue = std::priority_queue<std::shared_ptr<Order>, std::vector<std::shared_ptr<Order>>, BidComp>;
+    using AskQueue = std::priority_queue<std::shared_ptr<Order>, std::vector<std::shared_ptr<Order>>, AskComp>;
+
     std::expected<MatchResult, MatchingError> processOrder(std::shared_ptr<Order> newOrder);
     std::expected<void, MatchingError> cancelOrder(OrderId id);
     std::shared_ptr<Order> getOrder(OrderId id);
     std::optional<Decimal> getBestAsk() const;
+    BidQueue getBidQueue() const {return m_bids;}
+    AskQueue getAskQueue() const {return m_asks;}
 
 private:
-    using BidQueue = std::priority_queue<std::shared_ptr<Order>, std::vector<std::shared_ptr<Order>>, BidComp>;
-    using AskQueue = std::priority_queue<std::shared_ptr<Order>, std::vector<std::shared_ptr<Order>>, AskComp>;
+
 
     BidQueue m_bids{BidComp{}};
     AskQueue m_asks{AskComp{}};

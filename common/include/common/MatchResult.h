@@ -1,7 +1,9 @@
 #pragma once
 
-#include "common/Order.h"
-#include "common/Trade.h"
+#include "Order.h"
+#include "Trade.h"
+#include "Decimal.h"
+#include "Types.h"
 
 struct PartialFill {
     OrderId order_id;

@@ -50,7 +50,6 @@ message Candles {
 }
 
 service MarketService {
-
   rpc ListInstruments(google.protobuf.Empty)
       returns (InstrumentsList);
 

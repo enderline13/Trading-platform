@@ -4,7 +4,7 @@
 #include "Types.h"
 
 struct Candle {
-    Timestamp time;
+    Timestamp timestamp;
     Decimal open;
     Decimal high;
     Decimal low;

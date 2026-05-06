@@ -3,6 +3,43 @@
 #include <spdlog/spdlog.h>
 
 #include "core/TransactionGuard.h"
+#include "common/ProtoMapper.h"
+
+#include "common.pb.h"
+
+inline market::OrderBook toProto(const OrderBook& book) {
+    market::OrderBook result;
+
+    std::map<Decimal, Decimal, std::greater<Decimal>> aggregatedBids;
+    auto bids = book.getBidQueue();
+    while (!bids.empty()) {
+        const auto& order = bids.top();
+        aggregatedBids[order->price] = aggregatedBids[order->price] + order->quantity;
+        bids.pop();
+    }
+
+    for (const auto& [price, qty] : aggregatedBids) {
+        auto* level = result.add_bids();
+        *level->mutable_price() = mapper::toProto(price);
+        *level->mutable_quantity() = mapper::toProto(qty);
+    }
+
+    std::map<Decimal, Decimal, std::less<Decimal>> aggregatedAsks;
+    auto asks = book.getAskQueue();
+    while (!asks.empty()) {
+        const auto& order = asks.top();
+        aggregatedAsks[order->price] = aggregatedAsks[order->price] + order->quantity;
+        asks.pop();
+    }
+
+    for (const auto& [price, qty] : aggregatedAsks) {
+        auto* level = result.add_asks();
+        *level->mutable_price() = mapper::toProto(price);
+        *level->mutable_quantity() = mapper::toProto(qty);
+    }
+
+    return result;
+}
 
 std::expected<PlaceOrderResult, TradingError>
 TradingCore::placeOrder(const PlaceOrderCommand& cmd) const
@@ -107,6 +144,9 @@ TradingCore::placeOrder(const PlaceOrderCommand& cmd) const
 
             m_accounts->settleTrade(buyOrder->user_id, sellOrder->user_id,
                                    trade.instrument_id, trade.quantity, trade.price, tradeId);
+
+            auto trade_msg = mapper::toProto(trade);
+            m_marketData->onTrade(trade.instrument_id, trade_msg);
         }
         else {
             spdlog::error("There is no both buyer and seller order in the trade");
@@ -114,10 +154,30 @@ TradingCore::placeOrder(const PlaceOrderCommand& cmd) const
         }
     }
 
-    if (cmd.side == Order::Side::BUY && cmd.type != Order::Type::STOP) {
-        Decimal totalLocked = lockPrice * cmd.quantity;
-        if (order.status == Order::Status::FILLED && totalLocked > totalSpent) {
-            m_accounts->unlockBalance(cmd.user_id, totalLocked - totalSpent);
+    broadcastOrderBook(order.instrument_id);
+
+    auto orderFinalStatus = order.status;
+    bool orderIsResting = (order.type == Order::Type::LIMIT &&
+                           (orderFinalStatus == Order::Status::NEW ||
+                            orderFinalStatus == Order::Status::PARTIALLY_FILLED));
+
+    if (!orderIsResting) { // ордер полностью отработан и убран из стакана
+        if (cmd.side == Order::Side::BUY) {
+            Decimal totalLocked = lockPrice * cmd.quantity;
+            Decimal overLocked = totalLocked - totalSpent;
+            if (overLocked > Decimal{0,0}) {
+                m_accounts->unlockBalance(cmd.user_id, overLocked);
+                spdlog::info("Unlocked excess balance {} for OrderID={}",
+                             overLocked.toString(), order.id);
+            }
+        } else { // SELL
+            Decimal filledQty = cmd.quantity - order.remaining_quantity; // фактически исполнено
+            Decimal overLocked = cmd.quantity - filledQty;
+            if (overLocked > Decimal{0,0}) {
+                m_accounts->unlockAsset(cmd.user_id, cmd.instrument_id, overLocked);
+                spdlog::info("Unlocked excess asset {} for OrderID={}",
+                             overLocked.toString(), order.id);
+            }
         }
     }
 
@@ -135,6 +195,17 @@ TradingCore::placeOrder(const PlaceOrderCommand& cmd) const
 
     tx.commit();
     return PlaceOrderResult{id, order.status};
+}
+
+void TradingCore::broadcastOrderBook(const uint64_t instrumentId) const {
+    const auto internalBook = m_matching->getOrderBook(instrumentId);
+    if (!internalBook) {
+        spdlog::error("Could not get order book for instrument {}", instrumentId);
+        return;
+    }
+
+    const market::OrderBook protoBook = toProto(*internalBook.value());
+    m_marketData->onBookUpdate(instrumentId, protoBook);
 }
 
 std::vector<Instrument> TradingCore::getAllInstruments() const {
@@ -192,6 +263,8 @@ TradingCore::cancelOrder(const CancelOrderCommand& cmd) const
     updated.remaining_quantity = Decimal{0,0};
     m_orders->update(updated);
 
+    broadcastOrderBook(order.instrument_id);
+
     tx.commit();
     return {};
 }
@@ -224,4 +297,8 @@ TradingCore::getTradeHistory(const GetTradesQuery& query) const
 {
     spdlog::info("Getting trade history by instrument: {}", query.instrument_id.has_value());
     return m_trades->getByUser(query.user_id, query.instrument_id);
+}
+
+std::optional<Decimal> TradingCore::getBestAsk(const InstrumentId instrumentId) const {
+    return m_matching->getBestAsk(instrumentId);
 }

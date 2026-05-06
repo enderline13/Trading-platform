@@ -79,9 +79,10 @@ std::expected<std::shared_ptr<Order>, MatchingError> MatchingEngine::getOrder(co
 
 std::optional<Decimal> MatchingEngine::getBestAsk(const uint64_t instrumentId) {
     std::scoped_lock lock(m_mutex);
-    if (!m_books.contains(instrumentId)) {
-        spdlog::error("Could not find instrument with id {}", instrumentId);
-        return std::nullopt;
+
+    auto& book = m_books[instrumentId];
+    if (!book) {
+        book = std::make_shared<OrderBook>();
     }
-    return m_books[instrumentId]->getBestAsk();
+    return book->getBestAsk();
 }

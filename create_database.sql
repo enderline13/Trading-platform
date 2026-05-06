@@ -5,6 +5,7 @@ USE trading_platform;
 CREATE TABLE users (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     email VARCHAR(255) NOT NULL UNIQUE,
+    email VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     role ENUM('USER', 'ADMIN') NOT NULL DEFAULT 'USER',
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -15,6 +16,7 @@ CREATE TABLE accounts (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id BIGINT NOT NULL UNIQUE,
     balance_cash DECIMAL(18,8) NOT NULL DEFAULT 0,
+    balance_reserved DECIMAL(18,8) NOT NULL DEFAULT 0,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
@@ -79,6 +81,7 @@ CREATE TABLE positions (
     account_id BIGINT NOT NULL,
     instrument_id BIGINT NOT NULL,
     quantity DECIMAL(18,8) NOT NULL DEFAULT 0,
+    quantity_reserved DECIMAL(18,8) NOT NULL DEFAULT 0,
     average_price DECIMAL(18,8) NOT NULL DEFAULT 0,
 
     UNIQUE (account_id, instrument_id),
@@ -91,7 +94,7 @@ CREATE TABLE balance_history (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     account_id BIGINT NOT NULL,
     change_amount DECIMAL(18,8) NOT NULL,
-    reason ENUM('TRADE','DEPOSIT','WITHDRAWAL','FEE') NOT NULL,
+    reason ENUM('TRADE_BUY', 'TRADE_SELL','DEPOSIT','WITHDRAWAL','FEE') NOT NULL,
     reference_id BIGINT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 

@@ -14,12 +14,12 @@
 
 class MatchingEngine {
 public:
-    std::expected<MatchResult, MatchingError> submitOrder(const std::shared_ptr<Order> order);
+    std::expected<MatchResult, MatchingError> submitOrder(std::shared_ptr<Order> order);
     std::expected<void, MatchingError> cancelOrder(OrderId id);
 
     std::expected<std::shared_ptr<const OrderBook>, MatchingError> getOrderBook(InstrumentId id) const;
     std::expected<std::shared_ptr<Order>, MatchingError> getOrder(OrderId id);
-    std::optional<Decimal> getBestAsk(uint64_t instrumentId);
+    std::optional<Decimal> getBestAsk(InstrumentId instrumentId);
 
 private:
     std::unordered_map<OrderId, OrderLocation> m_order_locations;

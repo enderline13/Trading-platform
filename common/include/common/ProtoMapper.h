@@ -1,12 +1,25 @@
 #pragma once
+
 #include "common.grpc.pb.h"
 #include "admin.pb.h"
 #include "trading.pb.h"
 #include "common.pb.h"
+#include "auth.pb.h"
 #include <google/protobuf/util/time_util.h>
 
 #include "common/Instrument.h"
 #include "common/Order.h"
+#include "common/Position.h"
+#include "common/User.h"
+#include "common/Trade.h"
+#include "common/Candle.h"
+
+struct AddPositionRequest {
+    uint64_t user_id = 0;
+    uint64_t instrument_id = 0;
+
+    Decimal quantity;
+};
 
 namespace mapper {
 
@@ -79,14 +92,6 @@ namespace mapper {
         return pu;
     }
 
-    AddPositionRequest fromProto(const admin::AddPositionRequest& req) {
-        return {
-            .user_id = req.user_id(),
-            .instrument_id = req.instrument_id(),
-            .quantity = fromProto(req.quantity())
-        };
-    }
-
     inline common::Order::OrderStatus toProto(const Order::Status status) {
         switch (status) {
             case Order::Status::NEW:  return common::Order::NEW;
@@ -106,6 +111,7 @@ namespace mapper {
             case common::Order::OrderStatus::Order_OrderStatus_REJECTED:  return Order::Status::REJECTED;
             case common::Order::OrderStatus::Order_OrderStatus_FILLED:  return Order::Status::FILLED;
             case common::Order::OrderStatus::Order_OrderStatus_PARTIALLY_FILLED:  return Order::Status::PARTIALLY_FILLED;
+            default: return Order::Status::NEW;
         }
 
         return Order::Status::NEW;
@@ -179,5 +185,34 @@ namespace mapper {
         return pt;
     }
 
+    inline common::Candle toProto(const Candle& src) {
+        common::Candle dst;
 
+        // --- Timestamp ---
+        *dst.mutable_time() = toProtoTimestamp(src.timestamp);
+
+        // --- OHLC ---
+        *dst.mutable_open()  = toProto(src.open);
+        *dst.mutable_high()  = toProto(src.high);
+        *dst.mutable_low()   = toProto(src.low);
+        *dst.mutable_close() = toProto(src.close);
+
+        // --- Volume ---
+        *dst.mutable_volume() = toProto(src.volume);
+
+        return dst;
+    }
+
+    inline AddPositionRequest fromProto(const admin::AddPositionRequest& src) {
+        AddPositionRequest dst;
+
+        // --- primitive ---
+        dst.user_id = src.user_id();
+        dst.instrument_id = src.instrument_id();
+
+        // --- nested message ---
+        dst.quantity = fromProto(src.quantity());
+
+        return dst;
+    }
 }

@@ -13,6 +13,7 @@
 #include "storage/ITradeRepository.h"
 #include "storage/IOrderRepository.h"
 #include "storage/IInstrumentRepository.h"
+#include "MarketDataManager.h"
 
 struct PlaceOrderCommand {
     UserId user_id = 0;
@@ -49,7 +50,8 @@ public:
     TradingCore(std::shared_ptr<sql::Connection> conn, std::shared_ptr<IOrderRepository> orders,
             std::shared_ptr<ITradeRepository> trades,
             std::shared_ptr<IAccountRepository> accounts, std::shared_ptr<IInstrumentRepository> instruments,
-            std::shared_ptr<MatchingEngine> matching) : m_conn(std::move(conn)), m_orders(std::move(orders)), m_trades(std::move(trades)), m_accounts(std::move(accounts)), m_matching(std::move(matching)), m_instruments(std::move(instruments)) {}
+            std::shared_ptr<MatchingEngine> matching,
+            std::shared_ptr<MarketDataManager> marketData) : m_conn(std::move(conn)), m_orders(std::move(orders)), m_trades(std::move(trades)), m_accounts(std::move(accounts)), m_matching(std::move(matching)), m_instruments(std::move(instruments)), m_marketData(std::move(marketData)) {}
 
     std::expected<PlaceOrderResult, TradingError> placeOrder(const PlaceOrderCommand&) const;
     std::expected<void, TradingError> cancelOrder(const CancelOrderCommand&) const;
@@ -57,6 +59,8 @@ public:
     std::expected<std::vector<Trade>, TradingError> getTradeHistory(const GetTradesQuery&) const;
     std::vector<Instrument> getAllInstruments() const;
     std::expected<Order, TradingError> getOrder(OrderId orderId) const;
+    void broadcastOrderBook(uint64_t instrumentId) const;
+    std::optional<Decimal> getBestAsk(InstrumentId instrumentId) const;
 
 private:
     std::shared_ptr<sql::Connection> m_conn;
@@ -65,4 +69,6 @@ private:
     std::shared_ptr<IAccountRepository> m_accounts;
     std::shared_ptr<MatchingEngine> m_matching;
     std::shared_ptr<IInstrumentRepository> m_instruments;
+
+    std::shared_ptr<MarketDataManager> m_marketData;
 };

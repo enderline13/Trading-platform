@@ -1,6 +1,6 @@
 #include "trading.grpc.pb.h"
 #include "core/core.h"
-#include "../utils/ProtoMapper.h"
+#include "../../common/include/common/ProtoMapper.h"
 #include "../utils/Authenticate.h"
 
 class TradingServiceImpl final : public trading::TradingService::Service {

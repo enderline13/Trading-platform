@@ -5,7 +5,9 @@
 #include "../services/TradingService.h"
 #include "../services/AccountService.h"
 #include "../services/AdminService.h"
+#include "../services/MarketService.h"
 #include "core/core.h"
+#include "core/TradingSimulator.h"
 #include "storage/DatabaseManager.h"
 
 int main() {
@@ -19,8 +21,11 @@ int main() {
     auto accountRepo = std::make_shared<MySqlAccountRepository>(conn);
     auto instrumentRepo = std::make_shared<MySqlInstrumentRepository>(conn);
     auto matchingEngine = std::make_shared<MatchingEngine>();
+    auto marketDataManager = std::make_shared<MarketDataManager>();
 
-    auto core = std::make_shared<Core>(conn, userRepo, orderRepo, tradeRepo, accountRepo, instrumentRepo, matchingEngine);
+    auto core = std::make_shared<Core>(conn, userRepo, orderRepo, tradeRepo, accountRepo, instrumentRepo, matchingEngine, marketDataManager);
+
+    //TradingSimulator simulator(core, 5);
 
     grpc::ServerBuilder builder;
     builder.AddListeningPort("0.0.0.0:50051", grpc::InsecureServerCredentials());
@@ -29,15 +34,18 @@ int main() {
     TradingServiceImpl tradingService(core);
     AccountServiceImpl accountService(core);
     AdminServiceImpl adminService(core);
+    MarketServiceImpl marketService(core);
 
     grpc::reflection::InitProtoReflectionServerBuilderPlugin();
     builder.RegisterService(&authService);
     builder.RegisterService(&tradingService);
     builder.RegisterService(&accountService);
     builder.RegisterService(&adminService);
+    builder.RegisterService(&marketService);
 
     std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
     std::cout << "Gateway Server listening on 0.0.0.0:50051" << std::endl;
+    //simulator.start();
     server->Wait();
 
     return 0;
