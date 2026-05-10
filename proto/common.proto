@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package common;
-
 import "google/protobuf/timestamp.proto";
+
+package common;
 
 message Decimal {
   int64 units = 1;

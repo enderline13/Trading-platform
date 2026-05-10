@@ -1,10 +1,10 @@
 syntax = "proto3";
 
-package account;
-
 import "google/protobuf/empty.proto";
 import "common.proto";
 import "google/protobuf/timestamp.proto";
+
+package account;
 
 message UserPositions {
   repeated common.Position positions = 1;

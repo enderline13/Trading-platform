@@ -1,9 +1,9 @@
 syntax = "proto3";
 
-package trading;
-
 import "google/protobuf/empty.proto";
 import "common.proto";
+
+package trading;
 
 message PlaceOrderRequest {
 
