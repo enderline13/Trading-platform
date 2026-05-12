@@ -6,6 +6,7 @@
 #include "common/Instrument.h"
 #include "common/Types.h"
 #include "utils.h"
+#include "DatabaseManager.h"
 
 class IInstrumentRepository {
 public:
@@ -25,6 +26,7 @@ public:
     MySqlInstrumentRepository(std::shared_ptr<sql::Connection> conn) : m_conn(std::move(conn)) {}
 
     void add(const Instrument& i) override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement(
             "INSERT INTO instruments (symbol, name, tick_size, lot_size, is_active) "
             "VALUES (?, ?, ?, ?, ?)"
@@ -38,6 +40,7 @@ public:
     }
 
     void update(const Instrument& i) override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement(
             "UPDATE instruments SET symbol = ?, name = ?, tick_size = ?, lot_size = ?, is_active = ? "
             "WHERE id = ?"
@@ -59,6 +62,7 @@ public:
     }
 
     std::vector<Instrument> getAll() override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         std::vector<Instrument> result;
         StatementPtr stmt(m_conn->createStatement());
         ResultSetPtr res(stmt->executeQuery("SELECT * FROM instruments"));
@@ -79,6 +83,7 @@ public:
     }
 
     std::optional<Instrument> getById(const InstrumentId id) override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement(
           "SELECT id, symbol, name, tick_size, lot_size, is_active FROM instruments WHERE id = ?"
         ));

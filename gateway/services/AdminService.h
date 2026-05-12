@@ -99,7 +99,7 @@ public:
 
             const auto now = std::chrono::system_clock::now();
             const auto uptime = std::chrono::duration_cast<std::chrono::hours>(now - m_startTime).count();
-            response->set_uptime(std::to_string(uptime) + " hours");
+            response->set_uptime(std::to_string(uptime) + " часов");
 
             return grpc::Status::OK;
         }

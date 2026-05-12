@@ -55,12 +55,29 @@ public:
     }
 
     grpc::Status GetCandles(grpc::ServerContext* context,
-                            const market::CandlesRequest* request,
-                            market::Candles* response) override {
+                        const market::CandlesRequest* request,
+                        market::Candles* response) override
+    {
         auto instData = m_core->getMarketData().getInstrument(request->instrument_id());
-        auto history = instData->getCandles();
+        auto history = instData->getCandles();  // все свечи
+
+        // Преобразуем begin/end в time_point, если заданы
+        std::optional<std::chrono::system_clock::time_point> from, to;
+        if (request->has_begin()) {
+            from = std::chrono::system_clock::from_time_t(request->begin().seconds());
+        }
+        if (request->has_end()) {
+            to = std::chrono::system_clock::from_time_t(request->end().seconds());
+        }
+
+        uint32_t limit = request->limit(); // 0 = без ограничения
+        uint32_t count = 0;
 
         for (const auto& c : history) {
+            // Фильтр по времени
+            if (from && c.timestamp < *from) continue;
+            if (to   && c.timestamp > *to)   continue;
+
             auto* proto_c = response->add_candles();
 
             *proto_c->mutable_time()   = mapper::toProtoTimestamp(c.timestamp);
@@ -69,6 +86,8 @@ public:
             *proto_c->mutable_low()    = mapper::toProto(c.low);
             *proto_c->mutable_close()  = mapper::toProto(c.close);
             *proto_c->mutable_volume() = mapper::toProto(c.volume);
+
+            if (limit > 0 && ++count >= limit) break;
         }
         return grpc::Status::OK;
     }

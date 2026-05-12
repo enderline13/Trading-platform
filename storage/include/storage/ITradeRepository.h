@@ -22,6 +22,7 @@ public:
     explicit MySqlTradeRepository(std::shared_ptr<sql::Connection> conn) : m_conn(std::move(conn)) {}
 
     TradeId save(const Trade& trade, const UserId buyer, const UserId seller) override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement(
             "INSERT INTO trades (instrument_id, buy_order_id, sell_order_id, price, quantity) VALUES (?, ?, ?, ?, ?)"
         ));
@@ -42,6 +43,7 @@ public:
     }
 
     std::vector<Trade> getByUser(const UserId userId, const std::optional<InstrumentId> instId) override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         std::string query =
             "SELECT DISTINCT t.* FROM trades t "
             "JOIN orders o ON (t.buy_order_id = o.id OR t.sell_order_id = o.id) "

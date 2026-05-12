@@ -26,8 +26,8 @@ public:
             *response = mapper::toProto(*balance);
             return grpc::Status::OK;
         }
-        catch (...) {
-            return {grpc::StatusCode::INTERNAL, "Unknown internal error occurred"};
+        catch (std::exception& e) {
+            return {grpc::StatusCode::INTERNAL, std::format("Unknown internal error occurred %s", e.what())};
         }
 
     }

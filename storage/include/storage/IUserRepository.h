@@ -9,6 +9,7 @@
 #include "common/Types.h"
 #include "common/User.h"
 #include "utils.h"
+#include "DatabaseManager.h"
 
 class IUserRepository {
 public:
@@ -25,6 +26,7 @@ private:
     std::shared_ptr<sql::Connection> m_conn;
 
     std::optional<User> getByField(const std::string& field, const std::string& value) const {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement("SELECT id, email, username, password_hash, role FROM users WHERE " + field + " = ?"));
         pstmt->setString(1, value);
 
@@ -47,6 +49,7 @@ public:
     std::optional<User> getByUsername(const std::string& username) override { return getByField("username", username); }
 
     UserId create(const User& user) override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement("INSERT INTO users (email, password_hash, username) VALUES (?, ?, ?)"));
         pstmt->setString(1, user.email);
         pstmt->setString(2, user.password_hash);

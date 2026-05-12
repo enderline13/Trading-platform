@@ -72,6 +72,7 @@ public:
        : m_conn(std::move(conn)) {}
 
     bool lockBalance(const UserId userId, const Decimal amount) override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
     PrepStatementPtr pstmt(m_conn->prepareStatement(
         "UPDATE accounts SET balance_cash = balance_cash - ?, balance_reserved = balance_reserved + ? "
         "WHERE user_id = ? AND balance_cash >= ?"
@@ -86,6 +87,7 @@ public:
 }
 
     void unlockBalance(const UserId userId, const Decimal amount) override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement(
             "UPDATE accounts SET balance_cash = balance_cash + ?, balance_reserved = balance_reserved - ? "
             "WHERE user_id = ?"
@@ -98,6 +100,7 @@ public:
     }
 
     bool lockAsset(const UserId userId, const InstrumentId instId, const Decimal qty) override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement(
             "UPDATE positions SET quantity = quantity - ?, quantity_reserved = quantity_reserved + ? "
             "WHERE instrument_id = ? AND account_id = (SELECT id FROM accounts WHERE user_id = ?) AND quantity >= ?"
@@ -113,6 +116,7 @@ public:
     }
 
     void unlockAsset(const UserId userId, const InstrumentId instId, const Decimal qty) override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement(
             "UPDATE positions SET quantity = quantity + ?, quantity_reserved = quantity_reserved - ? "
             "WHERE instrument_id = ? AND account_id = (SELECT id FROM accounts WHERE user_id = ?)"
@@ -128,6 +132,7 @@ public:
     }
 
     void settleTrade(const UserId buyerId, const UserId sellerId, const InstrumentId instId, const Decimal qty, const Decimal price, TradeId tradeId) override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         const Decimal totalCost = price * qty;
 
         updateBalanceReserved(buyerId, -totalCost);
@@ -146,6 +151,7 @@ public:
     // BALANCE
 
     std::optional<Decimal> getBalance(const UserId userId) override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement(
             "SELECT balance_cash FROM accounts WHERE user_id = ?"
         ));
@@ -159,6 +165,7 @@ public:
     }
 
     void updateBalance(const UserId userId, const Decimal newBalance) override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement(
             "UPDATE accounts SET balance_cash = ? WHERE user_id = ?"
         ));
@@ -168,6 +175,7 @@ public:
     }
 
     void changeBalance(const UserId userId, const Decimal delta) override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement(
             "UPDATE accounts SET balance_cash = balance_cash + ? WHERE user_id = ?"
         ));
@@ -193,6 +201,7 @@ public:
     }
 
     std::optional<Position> getPosition(const UserId userId, const InstrumentId instrumentId) override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement(
             "SELECT p.quantity, p.average_price "
             "FROM positions p "
@@ -217,6 +226,7 @@ public:
                     const Decimal quantityDelta,
                     const Decimal price) override
     {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement(
             "INSERT INTO positions (account_id, instrument_id, quantity, average_price) "
             "SELECT id, ?, ?, ? FROM accounts WHERE user_id = ? "
@@ -270,6 +280,7 @@ public:
     }
 
     std::vector<Position> getPositions(const UserId userId) override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement(
             "SELECT p.instrument_id, p.quantity, p.average_price "
             "FROM positions p "
@@ -296,12 +307,14 @@ public:
     // SYSTEM STATUS
 
     void setSystemStatus(const bool running) override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement("UPDATE system_state SET trading_status = ?, id = 1"));
         pstmt->setString(1, running ? "RUNNING" : "STOPPED");
         pstmt->executeUpdate();
     }
 
     bool isSystemRunning() override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         if (ResultSetPtr res(m_conn->createStatement()->executeQuery("SELECT trading_status FROM system_state WHERE id = 1")); res->next()) return res->getString("trading_status") == "RUNNING";
         return false;
     }
@@ -309,6 +322,7 @@ public:
     // BALANCE HISTORY
 
     std::vector<BalanceHistoryEntry> getHistory(const uint64_t accountId) override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         std::vector<BalanceHistoryEntry> history;
 
         PrepStatementPtr pstmt(m_conn->prepareStatement(
@@ -342,6 +356,7 @@ public:
     }
 
     void addHistoryEntry(const uint64_t accountId, const Decimal amount, const std::string& reason, const std::optional<uint64_t> referenceId) override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement(
                 "INSERT INTO balance_history (account_id, change_amount, reason, reference_id) "
                 "VALUES (?, ?, ?, ?)"));
@@ -361,6 +376,7 @@ public:
     // HELPERS
 
     AccountId getAccountIdByUserId(const uint64_t userId) override {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement(
                 "SELECT id FROM accounts WHERE user_id = ?"));
         pstmt->setUInt64(1, userId);
