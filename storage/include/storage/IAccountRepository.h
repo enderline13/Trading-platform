@@ -132,7 +132,6 @@ public:
     }
 
     void settleTrade(const UserId buyerId, const UserId sellerId, const InstrumentId instId, const Decimal qty, const Decimal price, TradeId tradeId) override {
-        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         const Decimal totalCost = price * qty;
 
         updateBalanceReserved(buyerId, -totalCost);
@@ -231,50 +230,35 @@ public:
             "INSERT INTO positions (account_id, instrument_id, quantity, average_price) "
             "SELECT id, ?, ?, ? FROM accounts WHERE user_id = ? "
             "ON DUPLICATE KEY UPDATE "
-
-            // обновляем количество
             "quantity = quantity + ?, "
-
-            // обновляем среднюю цену
             "average_price = CASE "
-
-            // покупка
-            "WHEN ? > 0 THEN "
-            "  (average_price * quantity + ? * ?) / (quantity + ?) "
-
-            // полное закрытие
-            "WHEN quantity + ? = 0 THEN 0 "
-
-            // частичная продажа
+            "WHEN ? > 0 THEN (average_price * (quantity - ?) + ? * ?) / quantity "
+            "WHEN quantity = 0 THEN 0 "
             "ELSE average_price "
-
             "END"
         ));
 
         const std::string qStr = toSql(quantityDelta);
         const std::string pStr = toSql(price);
 
-        // INSERT
-        pstmt->setUInt64(1, instrumentId);
-        pstmt->setString(2, qStr);
-        pstmt->setString(3, pStr);
-        pstmt->setUInt64(4, userId);
+        // Параметры (индексы соответствуют «?» по порядку)
+        pstmt->setUInt64(1, instrumentId);      // INSERT instrument_id
+        pstmt->setString(2, qStr);              // INSERT quantity
+        pstmt->setString(3, pStr);              // INSERT average_price
+        pstmt->setUInt64(4, userId);            // WHERE user_id
 
-        // UPDATE
-
-        // quantity
+        // UPDATE quantity = quantity + ?
         pstmt->setString(5, qStr);
 
-        // WHEN ? > 0
+        // Условие WHEN ? > 0
         pstmt->setString(6, qStr);
 
-        // weighted avg
+        // quantityDelta для (quantity - ?)
         pstmt->setString(7, qStr);
-        pstmt->setString(8, pStr);
-        pstmt->setString(9, qStr);
 
-        // WHEN quantity + ? = 0
-        pstmt->setString(10, qStr);
+        // quantityDelta и price для (? * ?)
+        pstmt->setString(8, qStr);              // первый множитель – количество сделки
+        pstmt->setString(9, pStr);              // второй множитель – цена сделки
 
         pstmt->executeUpdate();
     }

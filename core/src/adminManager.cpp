@@ -10,6 +10,7 @@ admin::SystemStatus AdminManager::getSystemStatus() const {
     admin::SystemStatus status;
 
     auto countQuery = [&](const std::string& table) {
+        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
         auto stmt = m_conn->createStatement();
         auto res = stmt->executeQuery("SELECT COUNT(*) FROM " + table);
         return res->next() ? res->getUInt64(1) : 0;

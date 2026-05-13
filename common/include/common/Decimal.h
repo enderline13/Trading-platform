@@ -8,6 +8,7 @@
 struct Decimal {
     int64_t units = 0;
     int32_t nanos = 0;
+    static constexpr int32_t kNanoFactor = 1'000'000'000;
     Decimal() = default;
 
     Decimal(int64_t u, int32_t n) : units(u), nanos(n) {
@@ -27,7 +28,7 @@ struct Decimal {
     }
 
     auto operator<=>(const Decimal&) const = default;
-    static constexpr int32_t kNanoFactor = 1'000'000'000;
+
 
     Decimal operator-() const {
         return {-units, -nanos};
@@ -181,4 +182,8 @@ inline Decimal operator%(const Decimal& a, const Decimal& b) {
     int64_t rem = lhs % rhs;
 
     return Decimal::fromNano(rem);
+}
+
+inline double decimalToDouble(const Decimal& d) {
+    return static_cast<double>(d.units) + static_cast<double>(d.nanos) / Decimal::kNanoFactor;
 }

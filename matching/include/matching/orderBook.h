@@ -44,6 +44,7 @@ public:
     std::expected<void, MatchingError> cancelOrder(OrderId id);
     std::shared_ptr<Order> getOrder(OrderId id);
     std::optional<Decimal> getBestAsk() const;
+    std::optional<Decimal> getBestBid() const;
     BidQueue getBidQueue() const {return m_bids;}
     AskQueue getAskQueue() const {return m_asks;}
 

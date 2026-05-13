@@ -302,3 +302,7 @@ TradingCore::getTradeHistory(const GetTradesQuery& query) const
 std::optional<Decimal> TradingCore::getBestAsk(const InstrumentId instrumentId) const {
     return m_matching->getBestAsk(instrumentId);
 }
+
+std::optional<Decimal> TradingCore::getBestBid(const InstrumentId instrumentId) const {
+    return m_matching->getBestBid(instrumentId);
+}

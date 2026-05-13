@@ -118,6 +118,10 @@ public:
         return trading.getBestAsk(id);
     }
 
+    std::optional<Decimal> getBestBid(InstrumentId id) const {
+        return trading.getBestBid(id);
+    }
+
 private:
     std::shared_ptr<sql::Connection> m_conn;
 

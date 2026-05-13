@@ -25,7 +25,7 @@ int main() {
 
     auto core = std::make_shared<Core>(conn, userRepo, orderRepo, tradeRepo, accountRepo, instrumentRepo, matchingEngine, marketDataManager);
 
-    //TradingSimulator simulator(core, 5);
+    auto simulator = std::make_unique<TradingSimulator>(core, 5);
 
     grpc::ServerBuilder builder;
     builder.AddListeningPort("0.0.0.0:50051", grpc::InsecureServerCredentials());
@@ -45,7 +45,7 @@ int main() {
 
     std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
     std::cout << "Gateway Server listening on 0.0.0.0:50051" << std::endl;
-    //simulator.start();
+    simulator->start();
     server->Wait();
 
     return 0;

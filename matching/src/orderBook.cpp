@@ -188,3 +188,8 @@ std::optional<Decimal> OrderBook::getBestAsk() const {
     if (m_asks.empty()) return std::nullopt;
     return m_asks.top()->price;
 }
+
+std::optional<Decimal> OrderBook::getBestBid() const {
+    if (m_bids.empty()) return std::nullopt;
+    return m_bids.top()->price;
+}

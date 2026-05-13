@@ -86,3 +86,13 @@ std::optional<Decimal> MatchingEngine::getBestAsk(const uint64_t instrumentId) {
     }
     return book->getBestAsk();
 }
+
+std::optional<Decimal> MatchingEngine::getBestBid(const uint64_t instrumentId) {
+    std::scoped_lock lock(m_mutex);
+
+    auto& book = m_books[instrumentId];
+    if (!book) {
+        book = std::make_shared<OrderBook>();
+    }
+    return book->getBestBid();
+}

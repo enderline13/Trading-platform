@@ -61,6 +61,7 @@ public:
     std::expected<Order, TradingError> getOrder(OrderId orderId) const;
     void broadcastOrderBook(uint64_t instrumentId) const;
     std::optional<Decimal> getBestAsk(InstrumentId instrumentId) const;
+    std::optional<Decimal> getBestBid(InstrumentId id) const;
 
 private:
     std::shared_ptr<sql::Connection> m_conn;

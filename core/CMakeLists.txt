@@ -14,6 +14,7 @@ set(HEADERS
         include/core/TransactionGuard.h
         include/core/adminManager.h
         include/core/MarketDataManager.h
+        include/core/TradingSimulator.h
 )
 
 set(SOURCES
