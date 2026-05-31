@@ -55,6 +55,10 @@ AuthManager::login(const LoginCommand& cmd)
     const auto userOpt = m_users->getByUsername(cmd.username);
     if (!userOpt) return std::unexpected(AuthError::UserNotFound);
 
+    if (!userOpt->is_active) {
+        return std::unexpected(AuthError::UserBlocked);
+    }
+
     if (userOpt->password_hash != hashPassword(cmd.password))
         return std::unexpected(AuthError::InvalidCredentials);
 
@@ -81,6 +85,7 @@ AuthManager::validateToken(const Token_view token) const
     }
 
     auto user = m_users->getById(uid);
+
     if (!user) return std::unexpected(AuthError::UserNotFound);
 
     return user.value();

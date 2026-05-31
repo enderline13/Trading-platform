@@ -25,7 +25,7 @@ public:
     explicit MySqlOrderRepository(std::shared_ptr<sql::Connection> conn) : m_conn(std::move(conn)) {}
 
     void updateStatus(const OrderId id, const Order::Status status, const Decimal remainingQty) override {
-        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
+        std::lock_guard<std::recursive_mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement(
             "UPDATE orders SET status = ?, remaining_quantity = ? WHERE id = ?"
         ));
@@ -40,7 +40,7 @@ public:
     }
 
     OrderId create(const Order& order) override {
-        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
+        std::lock_guard<std::recursive_mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement(
             "INSERT INTO orders (user_id, instrument_id, type, side, price, quantity, remaining_quantity, status) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
@@ -64,7 +64,7 @@ public:
     }
 
     std::optional<Order> get(const OrderId id) override {
-        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
+        std::lock_guard<std::recursive_mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement("SELECT * FROM orders WHERE id = ?"));
         pstmt->setUInt64(1, id);
 
@@ -85,7 +85,7 @@ public:
     }
 
     void update(const Order& order) override {
-        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
+        std::lock_guard<std::recursive_mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement(
             "UPDATE orders SET remaining_quantity = ?, status = ? WHERE id = ?"
         ));
@@ -96,7 +96,7 @@ public:
     }
 
     std::vector<Order> getByUser(const UserId userId) override {
-        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
+        std::lock_guard<std::recursive_mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement("SELECT * FROM orders WHERE user_id = ?"));
         pstmt->setUInt64(1, userId);
         ResultSetPtr res(pstmt->executeQuery());

@@ -50,7 +50,6 @@ public:
 
 private:
 
-
     BidQueue m_bids{BidComp{}};
     AskQueue m_asks{AskComp{}};
 

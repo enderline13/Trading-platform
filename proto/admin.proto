@@ -1,6 +1,7 @@
 syntax = "proto3";
 
 import "common.proto";
+import "auth.proto";
 import "google/protobuf/empty.proto";
 
 package admin;
@@ -28,6 +29,32 @@ message SystemStateRequest {
   bool run_trading = 1; // true - RUNNING, false - STOPPED
 }
 
+message UserInfo {
+  uint64 id = 1;
+  string username = 2;
+  string email = 3;
+  auth.User.Role role = 4;
+  bool is_active = 5;
+}
+
+message ListUsersResponse {
+  repeated UserInfo users = 1;
+}
+
+message SetUserRoleRequest {
+  uint64 user_id = 1;
+  auth.User.Role role = 2;
+}
+
+message SetUserActiveRequest {
+  uint64 user_id = 1;
+  bool is_active = 2;
+}
+
+message DeleteInstrumentRequest {
+  uint64 instrument_id = 1;
+}
+
 service AdminService {
   rpc AddInstrument(common.Instrument) returns (google.protobuf.Empty);
   rpc UpdateInstrument(common.Instrument) returns (google.protobuf.Empty);
@@ -35,4 +62,9 @@ service AdminService {
   rpc GetSystemStatus(google.protobuf.Empty) returns (SystemStatus); // Нагрузка, кол-во активных ордеров
   rpc SetSystemState(SystemStateRequest) returns (google.protobuf.Empty);
   rpc AddPosition(AddPositionRequest) returns (google.protobuf.Empty);
+
+  rpc DeleteInstrument(DeleteInstrumentRequest) returns (google.protobuf.Empty);
+  rpc ListUsers(google.protobuf.Empty) returns (ListUsersResponse);
+  rpc SetUserRole(SetUserRoleRequest) returns (google.protobuf.Empty);
+  rpc SetUserActive(SetUserActiveRequest) returns (google.protobuf.Empty);
 }

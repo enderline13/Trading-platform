@@ -25,7 +25,7 @@ public:
         )
             : m_conn(conn), auth(conn, users),
               trading(conn, orders, trades, accounts, instruments, matching, marketData),
-              account(conn, accounts), admin(conn, instruments, accounts), m_marketData(marketData) {}
+              account(conn, accounts), admin(conn, instruments, accounts, users), m_marketData(marketData) {}
 
     std::expected<UserId, AuthError> registerUser(const RegisterCommand& cmd) const {
         return auth.registerUser(cmd);
@@ -120,6 +120,25 @@ public:
 
     std::optional<Decimal> getBestBid(InstrumentId id) const {
         return trading.getBestBid(id);
+    }
+
+    std::expected<void, std::string> deleteInstrument(InstrumentId id) {
+        admin.deleteInstrument(id);
+        return {};
+    }
+
+    std::expected<std::vector<User>, std::string> listUsers() {
+        return admin.listUsers();
+    }
+
+    std::expected<void, std::string> setUserRole(UserId userId, User::Role role) {
+        admin.setUserRole(userId, role);
+        return {};
+    }
+
+    std::expected<void, std::string> setUserActive(UserId userId, bool active) {
+        admin.setUserActive(userId, active);
+        return {};
     }
 
 private:

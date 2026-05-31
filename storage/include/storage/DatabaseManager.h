@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <mutex>
 
 #include "jdbc/mysql_driver.h"
 #include "jdbc/cppconn/connection.h"
@@ -25,8 +26,8 @@ public:
         return m_connection;
     }
 
-    static std::mutex& dbMutex() {
-        static std::mutex m;
+    static std::recursive_mutex& dbMutex() {
+        static std::recursive_mutex m;
         return m;
     }
 

@@ -12,8 +12,8 @@ struct User {
         USER,
         ADMIN
     };
-
     Role role = Role::USER;
+    bool is_active = true;
 
     bool operator==(const User& other) const {
         return id == other.id;

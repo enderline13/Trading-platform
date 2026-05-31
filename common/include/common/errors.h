@@ -20,7 +20,8 @@ enum class AuthError {
     InvalidCredentials,
     UserNotFound,
     InvalidToken,
-    InvalidInput
+    InvalidInput,
+    UserBlocked
 };
 
 enum class BalanceError {

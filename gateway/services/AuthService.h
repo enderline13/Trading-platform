@@ -14,9 +14,11 @@ private:
             case AuthError::InvalidCredentials:
                 return {grpc::StatusCode::UNAUTHENTICATED, "Invalid username or password"};
             case AuthError::UserAlreadyExists:
-                return {grpc::StatusCode::ALREADY_EXISTS, "User with this email/username already exists"};
+                return {grpc::StatusCode::ALREADY_EXISTS, "User with this email already exists"};
             case AuthError::UserNotFound:
                 return {grpc::StatusCode::NOT_FOUND, "User not found"};
+            case AuthError::UserBlocked:
+                return {grpc::StatusCode::PERMISSION_DENIED, "User is blocked"};
             default:
                 return {grpc::StatusCode::INTERNAL, "Internal authentication error"};
         }

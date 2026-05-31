@@ -147,4 +147,88 @@ public:
             return {grpc::StatusCode::INTERNAL, "Unknown internal error"};
         }
     }
+
+    grpc::Status DeleteInstrument(grpc::ServerContext* context,
+                              const admin::DeleteInstrumentRequest* request,
+                              google::protobuf::Empty* response) override {
+        try {
+            const auto authResult = authenticate(context, m_core);
+            if (!authResult) return {grpc::StatusCode::UNAUTHENTICATED, "Invalid token"};
+            if (authResult->role != User::Role::ADMIN) {
+                return {grpc::StatusCode::PERMISSION_DENIED, "Admin role required"};
+            }
+
+            m_core->deleteInstrument(request->instrument_id());
+            return grpc::Status::OK;
+        }
+        catch (...) {
+            return {grpc::StatusCode::INTERNAL, "Unknown internal error"};
+        }
+    }
+
+    grpc::Status ListUsers(grpc::ServerContext* context,
+                           const google::protobuf::Empty* request,
+                           admin::ListUsersResponse* response) override {
+        try {
+            const auto authResult = authenticate(context, m_core);
+            if (!authResult) return {grpc::StatusCode::UNAUTHENTICATED, "Invalid token"};
+            if (authResult->role != User::Role::ADMIN) {
+                return {grpc::StatusCode::PERMISSION_DENIED, "Admin role required"};
+            }
+
+            auto users = m_core->listUsers();
+            if (!users) return {grpc::StatusCode::INTERNAL, "Failed to fetch users"};
+            for (const auto& u : *users) {
+                auto* info = response->add_users();
+                info->set_id(u.id);
+                info->set_username(u.username);
+                info->set_email(u.email);
+                info->set_role(u.role == User::Role::ADMIN ? auth::User::ADMIN : auth::User::USER);
+                info->set_is_active(u.is_active);
+            }
+            return grpc::Status::OK;
+        }
+        catch (...) {
+            return {grpc::StatusCode::INTERNAL, "Unknown internal error"};
+        }
+
+    }
+
+    grpc::Status SetUserRole(grpc::ServerContext* context,
+                             const admin::SetUserRoleRequest* request,
+                             google::protobuf::Empty* response) override {
+        try {
+            const auto authResult = authenticate(context, m_core);
+            if (!authResult) return {grpc::StatusCode::UNAUTHENTICATED, "Invalid token"};
+            if (authResult->role != User::Role::ADMIN) {
+                return {grpc::StatusCode::PERMISSION_DENIED, "Admin role required"};
+            }
+
+            User::Role role = (request->role() == auth::User::ADMIN) ? User::Role::ADMIN : User::Role::USER;
+            m_core->setUserRole(request->user_id(), role);
+            return grpc::Status::OK;
+        }
+        catch (...) {
+            return {grpc::StatusCode::INTERNAL, "Unknown internal error"};
+        }
+    }
+
+    grpc::Status SetUserActive(grpc::ServerContext* context,
+                               const admin::SetUserActiveRequest* request,
+                               google::protobuf::Empty* response) override {
+        try {
+            const auto authResult = authenticate(context, m_core);
+            if (!authResult) return {grpc::StatusCode::UNAUTHENTICATED, "Invalid token"};
+            if (authResult->role != User::Role::ADMIN) {
+                return {grpc::StatusCode::PERMISSION_DENIED, "Admin role required"};
+            }
+
+            m_core->setUserActive(request->user_id(), request->is_active());
+            return grpc::Status::OK;
+        }
+        catch (...) {
+            return {grpc::StatusCode::INTERNAL, "Unknown internal error"};
+        }
+
+    }
 };

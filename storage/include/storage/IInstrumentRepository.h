@@ -16,6 +16,7 @@ public:
     virtual void update(const Instrument& i) = 0;
     virtual std::vector<Instrument> getAll() = 0;
     virtual std::optional<Instrument> getById(InstrumentId id) = 0;
+    virtual void remove(InstrumentId id) = 0;
 };
 
 class MySqlInstrumentRepository final : public IInstrumentRepository {
@@ -23,10 +24,10 @@ private:
     std::shared_ptr<sql::Connection> m_conn;
 
 public:
-    MySqlInstrumentRepository(std::shared_ptr<sql::Connection> conn) : m_conn(std::move(conn)) {}
+    explicit MySqlInstrumentRepository(std::shared_ptr<sql::Connection> conn) : m_conn(std::move(conn)) {}
 
     void add(const Instrument& i) override {
-        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
+        std::lock_guard<std::recursive_mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement(
             "INSERT INTO instruments (symbol, name, tick_size, lot_size, is_active) "
             "VALUES (?, ?, ?, ?, ?)"
@@ -39,8 +40,28 @@ public:
         pstmt->executeUpdate();
     }
 
+    void remove(InstrumentId id) override {
+        std::lock_guard<std::recursive_mutex> lock(DatabaseManager::dbMutex());
+        // Удаляем позиции, связанные с инструментом
+        {
+            PrepStatementPtr pstmt(m_conn->prepareStatement(
+                "DELETE FROM positions WHERE instrument_id = ?"
+            ));
+            pstmt->setUInt64(1, id);
+            pstmt->executeUpdate();
+        }
+        // Удаляем сам инструмент
+        PrepStatementPtr pstmt(m_conn->prepareStatement(
+            "DELETE FROM instruments WHERE id = ?"
+        ));
+        pstmt->setUInt64(1, id);
+        if (pstmt->executeUpdate() == 0) {
+            throw std::runtime_error("Instrument not found with ID: " + std::to_string(id));
+        }
+    }
+
     void update(const Instrument& i) override {
-        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
+        std::lock_guard<std::recursive_mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement(
             "UPDATE instruments SET symbol = ?, name = ?, tick_size = ?, lot_size = ?, is_active = ? "
             "WHERE id = ?"
@@ -62,7 +83,7 @@ public:
     }
 
     std::vector<Instrument> getAll() override {
-        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
+        std::lock_guard<std::recursive_mutex> lock(DatabaseManager::dbMutex());
         std::vector<Instrument> result;
         StatementPtr stmt(m_conn->createStatement());
         ResultSetPtr res(stmt->executeQuery("SELECT * FROM instruments"));
@@ -83,7 +104,7 @@ public:
     }
 
     std::optional<Instrument> getById(const InstrumentId id) override {
-        std::lock_guard<std::mutex> lock(DatabaseManager::dbMutex());
+        std::lock_guard<std::recursive_mutex> lock(DatabaseManager::dbMutex());
         PrepStatementPtr pstmt(m_conn->prepareStatement(
           "SELECT id, symbol, name, tick_size, lot_size, is_active FROM instruments WHERE id = ?"
         ));

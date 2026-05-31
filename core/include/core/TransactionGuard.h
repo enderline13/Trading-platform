@@ -10,8 +10,9 @@ namespace sql
 class TransactionGuard {
     std::shared_ptr<sql::Connection> m_conn;
     bool m_committed = false;
+    std::unique_lock<std::recursive_mutex> m_lock;
 public:
-    TransactionGuard(std::shared_ptr<sql::Connection> conn) : m_conn(conn) {
+    explicit TransactionGuard(std::shared_ptr<sql::Connection> conn) : m_conn(std::move(conn)), m_lock(DatabaseManager::dbMutex()) {
         m_conn->setAutoCommit(false);
     }
     ~TransactionGuard() {
